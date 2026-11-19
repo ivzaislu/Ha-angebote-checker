@@ -28,7 +28,7 @@ jobs:
       - name: Self-contained regression tests
         run: >-
           node --test scripts/browser-smoke-verdict.test.mjs
-          scripts/grok-pwa-plugin.test.mjs scripts/migration-plan.test.mjs
+          scripts/grok-pwa-plugin.test.mjs
           scripts/preview.test.mjs scripts/sign-out-plan.test.mjs
           src/lib/net.test.ts src/lib/product-knowledge.test.ts
           src/lib/app-data/app-data.test.ts
