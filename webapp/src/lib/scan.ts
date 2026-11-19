@@ -66,3 +66,13 @@ export const brainSnapshot = createServerFn({ method: "POST" })
     const { snapshotFor } = await import("@/lib/brain.server");
     return snapshotFor(data);
   });
+
+/** Autocomplete from products actually observed in offers, regardless of search intent. */
+export const productHints = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({
+    country: z.enum(["de", "at"]), prefix: z.string().min(2).max(40),
+  }).parse(data))
+  .handler(async ({ data }): Promise<{ name: string; seen: number }[]> => {
+    const { knownProductHints } = await import("@/lib/product-knowledge.server");
+    return knownProductHints(data.country, data.prefix);
+  });
