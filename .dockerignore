@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.output
+**/.vercel
+**/.nitro
+**/dist
+**/.test-tmp
+**/*.log
+**/.env
+**/.env.*
+**/training-candidates*.jsonl

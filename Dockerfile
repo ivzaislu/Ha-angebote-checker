@@ -14,6 +14,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=build /app/scripts/migration-plan.mjs ./scripts/migration-plan.mjs
+# Operator commands for collection/export, using the same code as the web app.
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/scripts/archive-marktguru.ts /app/scripts/register-alias.mjs /app/scripts/alias-loader.mjs ./scripts/
+COPY --from=build /app/src/lib/offer-archive.ts /app/src/lib/product-knowledge.ts /app/src/lib/product-variants.ts /app/src/lib/unit-price.ts /app/src/lib/exact.ts /app/src/lib/corpus.server.ts ./src/lib/
 USER node
 EXPOSE 8080
 CMD ["node", ".output/server/index.mjs"]

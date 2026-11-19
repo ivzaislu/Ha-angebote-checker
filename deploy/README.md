@@ -52,3 +52,57 @@ sudo bash deploy/legacy-ubuntu-install.sh
 
 Это пока не проверено на реальном Ubuntu 18.04. Для этого варианта нужен тест на сервере и проверка доступности GHCR-образа.
 
+
+## Docker Compose (внешний PostgreSQL)
+
+Нужны Docker Engine, **Docker Compose v2 с поддержкой `up --wait`**, доступ к GHCR и постоянный PostgreSQL. Сборка выполняется в GitHub Actions, поэтому Node.js и сборка на VPS не нужны. Локальный PostgreSQL в этот Compose не входит. Ограничения памяти для приложения и мигратора — 640 и 256 МБ соответственно, потребление Docker/ОС учитывайте отдельно.
+
+```bash
+git clone -b feature/self-learning-product-catalog https://github.com/ivzaislu/Ha-angebote-checker.git
+cd Ha-angebote-checker
+cp .env.compose.example .env
+chmod 600 .env
+# В редакторе задайте DATABASE_URL и APP_IMAGE с SHA проверенного образа.
+# Символы пароля в URL должны быть percent-encoded.
+docker compose config --quiet
+docker compose pull
+docker compose up -d --wait --wait-timeout 180
+docker compose ps -a
+curl --fail http://127.0.0.1:8080/
+```
+
+Образ нового коммита доступен только после успешного `Publish VPS image`. Если GHCR требует авторизацию, выполните `docker login ghcr.io` на сервере. Не выводите `docker compose config` без `--quiet` в публичные логи: он содержит URL базы.
+
+Мигратор запускается перед приложением. При ошибке миграции новое приложение не стартует. Проверка HTTP подтверждает ответ страницы; доступность базы и API проверяйте отдельно. Для проверки схемы без вывода реквизитов:
+
+```bash
+docker compose exec -T app node --input-type=module -e 'import pg from "pg"; const p=new pg.Pool({connectionString:process.env.DATABASE_URL}); try { const r=await p.query("select to_regclass($1) as archive",["public.offer_archive"]); if(!r.rows[0].archive) process.exitCode=1; else console.log("archive schema OK"); } finally { await p.end(); }'
+```
+
+После запуска проверьте поиск по своему индексу, «Историю цен», затем сохранность истории после `docker compose restart app`. Можно отдельно собрать небольшой региональный архив (создаёт реальные записи):
+
+```bash
+docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts collect 10115
+# Файл создаётся внутри контейнера; заберите его до пересоздания контейнера.
+docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts export /tmp/training-candidates.jsonl
+docker compose cp app:/tmp/training-candidates.jsonl ./training-candidates.jsonl
+```
+
+Сбор зависит от доступности Marktguru. Подробности формата и ограничений — [ARCHIVE.md](../webapp/ARCHIVE.md).
+
+### Обновление через Compose
+
+Сначала сохраните текущий SHA образа из `.env` и резервную копию PostgreSQL. Убедитесь, что порт не занят старым контейнером/systemd-сервисом. Останавливать существующее развёртывание следует только после определения того, каким способом оно запущено.
+
+```bash
+git pull --ff-only
+# Обновите APP_IMAGE в .env на новый проверенный SHA.
+docker compose pull
+# Явно повторите мигратор: завершившийся контейнер прошлого запуска не должен его пропустить.
+docker compose run --rm --no-deps migrate
+docker compose up -d --wait --wait-timeout 180 --force-recreate
+docker compose ps -a
+docker compose logs --tail 80 app
+```
+
+При неуспешной HTTP-проверке верните прежний `APP_IMAGE` и пересоздайте приложение. Миграции базы автоматически не откатываются. Команда `docker compose down` удаляет контейнеры этой Compose-конфигурации, но внешнюю PostgreSQL не затрагивает. Не запускайте `down` для другой существующей конфигурации без проверки.
