@@ -5,6 +5,7 @@ export type SalmonVariant = "salmon" | "smoked-salmon" | "pollock" | "salmon-ham
 /** Conservative labels: unknown fish are not silently treated as salmon. */
 export function salmonVariant(name: string): SalmonVariant {
   const key = productKey(name).replace(/\s+/g, "");
+  if (/lachsforelle/.test(key)) return null;
   if (/lachsschinken/.test(key)) return "salmon-ham";
   if (/seelachs/.test(key)) return "pollock";
   if (/(raucherlachs|stremellachs|raucherlachsfilet)/.test(key)) return "smoked-salmon";
