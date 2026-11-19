@@ -66,6 +66,9 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
           ) : null}
         </div>
         <p className="font-display text-3xl leading-none text-stamp">{deal.priceLabel}</p>
+        {deal.unitPrice ? (
+          <p className="text-xs text-muted">{deal.unitPrice.perUnit.toFixed(2).replace(".", ",")} € / {deal.unitPrice.unit}</p>
+        ) : null}
         <p className="mt-1 line-clamp-2 text-sm text-ink">
           {deal.productName && deal.productName !== deal.description
             ? `${deal.productName} · ${deal.description}`
