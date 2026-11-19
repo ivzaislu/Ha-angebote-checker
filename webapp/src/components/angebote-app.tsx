@@ -271,6 +271,13 @@ export function AngeboteApp() {
   }, [ready, listKey]);
 
   const zipValid = zipOk(country, zip);
+
+  // Automatically study leaflets once the user has configured a valid postcode.
+  // Server-side rememberWeek prevents repeating the same weekly study.
+  useEffect(() => {
+    if (!ready || !zipValid) return;
+    void study({ data: { country, zip } }).catch((err) => console.error("automatic leaflet study", err));
+  }, [ready, country, zip, zipValid, study]);
   const catalog = COUNTRIES[country];
 
   function onAdd(name: string) {
