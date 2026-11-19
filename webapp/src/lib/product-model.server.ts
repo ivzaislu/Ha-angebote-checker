@@ -1,0 +1,40 @@
+import { getSql } from "@/lib/db";
+import {
+  activeProductModelId,
+  readProductCandidate,
+  type ProductModelPackage,
+} from "./product-model-store.ts";
+let cached: ProductModelPackage | null = null;
+export async function currentProductModel(): Promise<ProductModelPackage | null> {
+  const sql = await getSql();
+  const id = await activeProductModelId(sql);
+  if (!id) {
+    cached = null;
+    return null;
+  }
+  if (cached?.id !== id) cached = await readProductCandidate(sql, id);
+  return cached;
+}
+export async function productModelStatus() {
+  const model = await currentProductModel();
+  const sql = await getSql();
+  const [count] = await sql.query<{ count: number }>(
+    "select count(*)::int as count from product_models",
+  );
+  return {
+    active: model
+      ? {
+          id: model.id,
+          version: model.net.version,
+          steps: model.net.steps,
+          trainCount: model.report.trainCount,
+          validationCount: model.report.validationCount,
+          testCount: model.report.testCount,
+          sources: model.report.sources,
+          testAccuracy: model.report.test.accuracy,
+          supportedIntents: model.report.supportedIntents,
+        }
+      : null,
+    candidates: count.count,
+  };
+}

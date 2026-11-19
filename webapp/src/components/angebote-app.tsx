@@ -14,7 +14,7 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import { neuralModelStatus, archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import type { BrainView } from "@/lib/brain";
 import { recognizeVariant } from "@/lib/product-variants";
 import { useAngebote, type LastScan } from "@/lib/store";
@@ -143,7 +143,7 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
           ) : null}
           {deal.onlineOnly ? <span>только онлайн</span> : null}
           {deal.fromArchive ? <span>из сохранённых акций</span> : null}
-          {deal.fromBrain ? <span>узнал по листовкам</span> : null}
+          {deal.fromBrain ? <span>проверено нейросетью</span> : null}
           {deal.relevance < 50 && !deal.fromBrain ? <span>похожее</span> : null}
         </p>
       </div>
@@ -258,6 +258,8 @@ export function AngeboteApp() {
   const hints = useServerFn(flyerHints);
   const catalogHints = useServerFn(productHints);
   const brainOf = useServerFn(brainSnapshot);
+  const modelStatus = useServerFn(neuralModelStatus);
+  const [neural, setNeural] = useState<Awaited<ReturnType<typeof neuralModelStatus>> | null>(null);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -287,6 +289,7 @@ export function AngeboteApp() {
 
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
+    void modelStatus().then(setNeural).catch(()=>undefined);
   }, []);
 
   useEffect(() => {
@@ -636,15 +639,23 @@ export function AngeboteApp() {
 
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Мозг акций</span>
+              <span>Нейросеть товаров</span>
               <span className="text-muted">
-                {brain && brain.steps > 0 ? `${brain.steps} шагов` : "учится"}
+                {neural?.active ? "активна · v2" : "не активирована"}
               </span>
             </summary>
             <p className="text-sm text-muted">
-              Нейросеть уже обучена на текущих акциях и на листовках из архива. Дальше доучивается, когда обновляете списки, в том числе на более старых проспектах, которые Marktguru ещё отдаёт. Веса не сбрасываются.
-              {brain && brain.steps > 0 ? ` Шагов ${brain.steps}, ошибка ${brain.loss.toFixed(2)}.` : ""}
+              {neural?.active
+                ? `Версия ${neural.active.id}. Обучающих примеров: ${neural.active.trainCount}; проверочных: ${neural.active.validationCount}; контрольных: ${neural.active.testCount}. Поддерживаемых запросов: ${neural.active.supportedIntents.length}.`
+                : "Поиск использует правила. Новая нейросеть включается после отдельного обучения и проверки качества."}
             </p>
+            {neural?.active ? <p className="mt-2 text-xs text-muted">
+              В подготовленном наборе: ручных меток {neural.active.sources.human ?? 0}, авторских учебных {neural.active.sources.curated ?? 0}, автоматических {neural.active.sources.rules ?? 0}.
+            </p> : null}
+            <p className="mt-2 text-xs text-muted">
+              Обновление листовок собирает данные. Обучение и переключение версий выполняются отдельной командой на сервере. Контрольный набор авторский; его результат не означает такую же точность на всех акциях. При неопределённом ответе используются правила.
+            </p>
+            <p className="mt-2 text-sm text-muted">Названия из ранее накопленного словаря:</p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">
                 {brain.intents.map((intent) => (
@@ -661,7 +672,7 @@ export function AngeboteApp() {
               </ul>
             ) : (
               <p className="mt-2 text-sm text-muted">
-                Пока нет разобранных названий. «Обновить списки» доучит сеть на листовках этой недели и на более старых проспектах.
+                Пока нет названий в словаре. Новые товары сохраняются при поиске и обновлении листовок.
               </p>
             )}
           </details>

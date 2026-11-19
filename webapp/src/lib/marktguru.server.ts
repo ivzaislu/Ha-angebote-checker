@@ -1,13 +1,15 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
 import { offerFits } from "@/lib/exact";
-import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
+import { learnLessons, rememberWeek, snapshotFor } from "@/lib/brain.server";
 import { gatherLessons } from "@/lib/corpus.server";
 import { rememberProducts } from "@/lib/product-knowledge.server";
 import { inferUnitPrice } from "@/lib/unit-price";
 import { archiveOffers } from "@/lib/offer-archive";
 import { getSql } from "@/lib/db";
 import { savedOffers } from "@/lib/offer-cache";
+import { currentProductModel } from "@/lib/product-model.server";
+import { decideProduct } from "@/lib/product-policy";
 import { compatibleSalmon } from "@/lib/product-variants";
 
 const UA = "Mozilla/5.0";
@@ -181,9 +183,14 @@ export async function searchDeals(input: {
 }): Promise<Deal[]> {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
-  const saved = await savedOffers(await getSql(), {...input,retailers});
+  const model = await currentProductModel().catch(error=>{console.error("product model",error);return null;});
+  const classify = (entry:RawOffer) => decideProduct(model,{
+    intent:input.query,name:entry.product?.name || entry.name || "",
+    description:entry.description || "",category:entry.categories?.[0]?.name || "",
+  });
+  const saved = await savedOffers(await getSql(), {...input,retailers},new Date(),entry=>classify(entry).keep);
   const cachedDeals = saved.flatMap(entry=>{
-    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image,null);
+    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image,classify(entry));
     return deal ? [{...deal,fromArchive:true}] : [];
   });
   if (cachedDeals.length) {
@@ -199,17 +206,6 @@ export async function searchDeals(input: {
     offerId: entry.id,
     price: entry.price,
   }))).catch((err) => console.error("product catalog", err));
-  const lessons: OfferLesson[] = raw.map((entry) => ({
-    name: entry.product?.name || entry.name || "",
-    description: entry.description || "",
-    category: entry.categories?.[0]?.name ?? "",
-  }));
-  let decisions: Array<{ keep: boolean; fromBrain: boolean }> | null = null;
-  try {
-    decisions = await observeOffers(input.query, lessons);
-  } catch (err) {
-    console.error("offer brain", err);
-  }
   const seen = new Set<string>();
   const deals: Deal[] = [];
 
@@ -219,7 +215,7 @@ export async function searchDeals(input: {
       input.query,
       retailers,
       CONFIG[input.country].image,
-      decisions?.[index] ?? null,
+      classify(raw[index]),
     );
     if (!deal) continue;
     const key = `${deal.retailer}|${deal.priceLabel}|${deal.description}|${deal.productName}`;

@@ -17,6 +17,7 @@ try {
   await page.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
   assert.equal(await page.evaluate(() => isSecureContext), false);
   assert.equal(await page.evaluate(() => typeof crypto.randomUUID), 'undefined');
+  await page.getByText('активна · v2',{exact:true}).waitFor();
   await page.locator('#item').fill('FrontendProbe');
   await page.getByRole('button', {name:'Добавить', exact:true}).click();
   await page.getByRole('button', {name:'Убрать FrontendProbe', exact:true}).waitFor();
@@ -38,12 +39,13 @@ try {
   await page.getByRole('button',{name:'Найти акции',exact:true}).click();
   await page.getByText('из сохранённых акций',{exact:true}).waitFor();
   await page.getByText('1,79 €',{exact:true}).waitFor();
+  await page.getByText('проверено нейросетью',{exact:true}).waitFor();
   await page.reload();
   await page.getByText('из сохранённых акций',{exact:true}).waitFor();
   await page.getByRole('button',{name:'История цен',exact:true}).click();
   await page.getByText('От 1.29 до 1.79 € · наблюдений: 2',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);
-  console.log('HTTP browser checks passed: add/remove, new list, reload persistence, cache-first search with live Marktguru blocked and real price history');
+  console.log('HTTP browser checks passed: add/remove, new list, reload persistence, active trained v2 model, cache-first search with live Marktguru blocked and real price history');
 } finally {
   await browser.close();
 }

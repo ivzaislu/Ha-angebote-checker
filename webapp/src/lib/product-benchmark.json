@@ -1,0 +1,260 @@
+[
+  {
+    "name": "Frische Landmilch 3,5% Fett",
+    "category": "Milch",
+    "description": "Kuhmilch",
+    "intents": [
+      "Milch"
+    ]
+  },
+  {
+    "name": "Laktosefreie H-Milch 1,5% Fett",
+    "category": "Milch",
+    "description": "Kuhmilch",
+    "intents": [
+      "Milch"
+    ]
+  },
+  {
+    "name": "Reine Landbuttermilch",
+    "category": "Milch",
+    "description": "Buttermilch",
+    "intents": [
+      "Buttermilch"
+    ]
+  },
+  {
+    "name": "Frische Buttermilch natur",
+    "category": "Milch",
+    "description": "Buttermilch",
+    "intents": [
+      "Buttermilch"
+    ]
+  },
+  {
+    "name": "Bio Haferdrink ungesüßt",
+    "category": "Milch",
+    "description": "Pflanzlicher Haferdrink",
+    "intents": [
+      "Hafermilch"
+    ]
+  },
+  {
+    "name": "Haferdrink Barista Edition",
+    "category": "Milch",
+    "description": "Pflanzlicher Haferdrink",
+    "intents": [
+      "Hafermilch"
+    ]
+  },
+  {
+    "name": "Snack-Gurken frisch",
+    "category": "Gemüse",
+    "description": "Frische Salatgurken",
+    "intents": [
+      "Gurke"
+    ]
+  },
+  {
+    "name": "Bio Schlangengurken",
+    "category": "Gemüse",
+    "description": "Frische Salatgurken",
+    "intents": [
+      "Gurke"
+    ]
+  },
+  {
+    "name": "Knackige Gewürzgurken im Glas",
+    "category": "Gemüsekonserven",
+    "description": "Eingelegte Gurken in Essig",
+    "intents": [
+      "Essiggurken"
+    ]
+  },
+  {
+    "name": "Essiggurken mit Dill",
+    "category": "Gemüsekonserven",
+    "description": "Eingelegte Gurken in Essig",
+    "intents": [
+      "Essiggurken"
+    ]
+  },
+  {
+    "name": "Frische Süßrahmbutter",
+    "category": "Butter",
+    "description": "Butter aus Milch",
+    "intents": [
+      "Butter"
+    ]
+  },
+  {
+    "name": "Bio Markenbutter",
+    "category": "Butter",
+    "description": "Butter aus Milch",
+    "intents": [
+      "Butter"
+    ]
+  },
+  {
+    "name": "Atlantisches Lachsfilet",
+    "category": "Frischfisch",
+    "description": "Lachs natur",
+    "intents": [
+      "Lachs"
+    ]
+  },
+  {
+    "name": "Frische Lachsportionen",
+    "category": "Frischfisch",
+    "description": "Lachs natur",
+    "intents": [
+      "Lachs"
+    ]
+  },
+  {
+    "name": "Räucherlachs in Scheiben",
+    "category": "Räucherfisch",
+    "description": "Geräucherter Lachs",
+    "intents": [
+      "Lachs",
+      "Räucherlachs"
+    ]
+  },
+  {
+    "name": "Stremellachsfilet natur",
+    "category": "Räucherfisch",
+    "description": "Geräucherter Lachs",
+    "intents": [
+      "Lachs",
+      "Räucherlachs"
+    ]
+  },
+  {
+    "name": "Alaska-Seelachsportionen",
+    "category": "Tiefkühlfisch",
+    "description": "Seelachsfilet",
+    "intents": [
+      "Seelachs"
+    ]
+  },
+  {
+    "name": "Tiefgekühlte Seelachsfilets",
+    "category": "Tiefkühlfisch",
+    "description": "Seelachsfilet",
+    "intents": [
+      "Seelachs"
+    ]
+  },
+  {
+    "name": "Espresso Kaffeebohnen ganze Bohne",
+    "category": "Kaffee",
+    "description": "Ganze geröstete Kaffeebohnen",
+    "intents": [
+      "Kaffee",
+      "Kaffeebohnen"
+    ]
+  },
+  {
+    "name": "Bio Kaffee in ganzen Bohnen",
+    "category": "Kaffee",
+    "description": "Ganze geröstete Kaffeebohnen",
+    "intents": [
+      "Kaffee",
+      "Kaffeebohnen"
+    ]
+  },
+  {
+    "name": "Bio Röstkaffee gemahlen",
+    "category": "Kaffee",
+    "description": "Gemahlener Filterkaffee",
+    "intents": [
+      "Filterkaffee",
+      "Kaffee"
+    ]
+  },
+  {
+    "name": "Milder Filterkaffee gemahlen",
+    "category": "Kaffee",
+    "description": "Gemahlener Filterkaffee",
+    "intents": [
+      "Filterkaffee",
+      "Kaffee"
+    ]
+  },
+  {
+    "name": "Knackige Tafeläpfel",
+    "category": "Obst",
+    "description": "Frische Äpfel",
+    "intents": [
+      "Apfel"
+    ]
+  },
+  {
+    "name": "Bio Tafeläpfel rot",
+    "category": "Obst",
+    "description": "Frische Äpfel",
+    "intents": [
+      "Apfel"
+    ]
+  },
+  {
+    "name": "Bio Apfel-Direktsaft naturtrüb",
+    "category": "Fruchtsaft",
+    "description": "Apfelsaft aus Äpfeln",
+    "intents": [
+      "Apfelsaft"
+    ]
+  },
+  {
+    "name": "Klarer Apfelsaft ohne Zuckerzusatz",
+    "category": "Fruchtsaft",
+    "description": "Apfelsaft aus Äpfeln",
+    "intents": [
+      "Apfelsaft"
+    ]
+  },
+  {
+    "name": "Recycling-Toilettenpapier 3-lagig",
+    "category": "Toilettenpapier",
+    "description": "Trockenes Toilettenpapier",
+    "intents": [
+      "Toilettenpapier"
+    ]
+  },
+  {
+    "name": "Weiches Toilettenpapier 4-lagig",
+    "category": "Toilettenpapier",
+    "description": "Trockenes Toilettenpapier",
+    "intents": [
+      "Toilettenpapier"
+    ]
+  },
+  {
+    "name": "Feuchtes Toilettenpapier Sensitive",
+    "category": "Toilettenpapier",
+    "description": "Feuchtes Toilettenpapier",
+    "intents": [
+      "Feuchtes Toilettenpapier"
+    ]
+  },
+  {
+    "name": "Feuchtes Toilettenpapier ohne Parfüm",
+    "category": "Toilettenpapier",
+    "description": "Feuchtes Toilettenpapier",
+    "intents": [
+      "Feuchtes Toilettenpapier"
+    ]
+  },
+  {
+    "name": "Kaffeevollautomat mit Mahlwerk",
+    "category": "Haushalt",
+    "description": "Kein Lebensmittel",
+    "intents": []
+  },
+  {
+    "name": "Lachsschinken in Scheiben",
+    "category": "Haushalt",
+    "description": "Kein Lebensmittel",
+    "intents": []
+  }
+]

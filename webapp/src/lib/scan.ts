@@ -89,3 +89,10 @@ export const archivedPriceHistory = createServerFn({ method: "POST" })
     const { priceHistory } = await import("@/lib/offer-archive");
     return priceHistory(await getSql(), data.country, data.name, data.zip);
   });
+
+/** Public read-only status; training and activation are operator-only CLI actions. */
+export const neuralModelStatus = createServerFn({method:"GET"})
+  .handler(async()=>{
+    const {productModelStatus}=await import("@/lib/product-model.server");
+    return productModelStatus();
+  });

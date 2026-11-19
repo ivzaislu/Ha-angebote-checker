@@ -50,6 +50,12 @@ jobs:
           docker compose restart app
           docker compose up -d --wait --wait-timeout 180
           docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e VERIFY_ONLY=1 app node --experimental-strip-types --input-type=module < deploy/compose-smoke.mjs
+      - name: Train and activate a qualified model against the isolated archive
+        run: |
+          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts train --activate-if-qualified
+          docker compose restart app
+          docker compose up -d --wait --wait-timeout 180
+          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts status
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -32,6 +32,8 @@
   },
   "include": [
     "src",
-    "server"
+    "server",
+    "scripts/product-model.ts",
+    "scripts/train-product-model.ts"
   ]
 }
