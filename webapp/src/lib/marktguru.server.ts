@@ -4,6 +4,7 @@ import { offerFits } from "@/lib/exact";
 import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
 import { gatherLessons } from "@/lib/corpus.server";
 import { rememberProducts } from "@/lib/product-knowledge.server";
+import { inferUnitPrice } from "@/lib/unit-price";
 
 const UA = "Mozilla/5.0";
 
@@ -125,6 +126,7 @@ function parseOffer(
     retailer,
     priceLabel: label,
     priceValue: value,
+    unitPrice: inferUnitPrice(`${productName} ${description}`, value),
     validFrom: formatDate(dates?.from || entry.validFrom),
     validTo: formatDate(dates?.to || entry.validTo),
     imageUrl: offerId ? imageTemplate.replace("{offer_id}", String(offerId)) : "",
