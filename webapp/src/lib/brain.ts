@@ -1,4 +1,5 @@
 import { hardReject, offerFits } from "@/lib/exact";
+import { applyNetDecision, createNet, decayNet, netReady, predict, trainLessons, type Net } from "@/lib/net";
 
 export type SeenName = { name: string; n: number };
 
@@ -14,6 +15,7 @@ export type BrainModel = {
   offers: number;
   week: string;
   intents: Record<string, IntentMemory>;
+  net: Net;
 };
 
 export type Lesson = {
@@ -36,6 +38,8 @@ export type BrainIntentView = {
 export type BrainView = {
   offers: number;
   week: string;
+  steps: number;
+  loss: number;
   intents: BrainIntentView[];
 };
 
@@ -64,7 +68,12 @@ const STOP = new Set([
 ]);
 
 export function emptyBrain(): BrainModel {
-  return { offers: 0, week: "", intents: {} };
+  return { offers: 0, week: "", intents: {}, net: createNet() };
+}
+
+export function ensureModelNet(model: BrainModel): Net {
+  if (!netReady(model.net)) model.net = createNet();
+  return model.net;
 }
 
 export function foldBrain(value: string): string {
@@ -125,6 +134,7 @@ export function rollWeek(model: BrainModel, week: string): void {
         return n > 0 ? [{ ...entry, n }] : [];
       });
     }
+    if (netReady(model.net)) decayNet(model.net);
   }
   if (week) model.week = week;
   prune(model);
@@ -147,6 +157,17 @@ export function learn(model: BrainModel, lessons: Lesson[]): void {
     for (const token of brainTokens(name)) touchToken(slot, token, lesson.positive);
     model.offers += 1;
   }
+  const net = ensureModelNet(model);
+  trainLessons(
+    net,
+    lessons
+      .filter((lesson) => lesson.intent.trim() && lesson.name.trim().length >= 3)
+      .map((lesson) => ({
+        intent: lesson.intent.trim(),
+        text: `${lesson.name} ${lesson.category}`,
+        positive: lesson.positive,
+      })),
+  );
   prune(model);
 }
 
@@ -218,13 +239,10 @@ export function decideOffer(
   category: string,
 ): { keep: boolean; fromBrain: boolean } {
   const fits = offerFits(query, name, description, category);
-  const slot = model.intents[intent];
-  if (!slot) return { keep: fits, fromBrain: false };
-  if (fits && vetoName(slot, name)) return { keep: false, fromBrain: true };
-  if (!fits && !hardReject(query, name, description, category) && supportToken(slot, name)) {
-    return { keep: true, fromBrain: true };
-  }
-  return { keep: fits, fromBrain: false };
+  const rejected = hardReject(query, name, description, category);
+  const net = ensureModelNet(model);
+  const probability = predict(net, intent, `${name} ${category}`);
+  return applyNetDecision(fits, rejected, probability, net.steps);
 }
 
 export function suggestFromModel(model: BrainModel, prefix: string, limit = 6): FlyerHint[] {

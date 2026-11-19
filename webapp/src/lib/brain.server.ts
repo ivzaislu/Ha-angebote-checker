@@ -1,4 +1,4 @@
-import { decideOffer, emptyBrain, intentView, learn, rollWeek, suggestFromModel, type BrainModel, type BrainView, type FlyerHint, type Lesson } from "@/lib/brain";
+import { decideOffer, emptyBrain, ensureModelNet, intentView, learn, rollWeek, suggestFromModel, type BrainModel, type BrainView, type FlyerHint, type Lesson } from "@/lib/brain";
 import { getSql } from "@/lib/db";
 import { exactQueryFor, offerFits } from "@/lib/exact";
 import { flyerWeekStart } from "@/lib/week";
@@ -62,7 +62,11 @@ async function readModel(): Promise<BrainModel> {
   }
   try {
     const parsed = JSON.parse(rows[0].model) as BrainModel;
-    brainGlobal.__offerBrain = parsed?.intents ? parsed : emptyBrain();
+    if (!parsed?.intents) brainGlobal.__offerBrain = emptyBrain();
+    else {
+      ensureModelNet(parsed);
+      brainGlobal.__offerBrain = parsed;
+    }
   } catch {
     brainGlobal.__offerBrain = emptyBrain();
   }
@@ -135,5 +139,6 @@ export async function snapshotFor(queries: string[]): Promise<BrainView> {
     const view = intentView(model.intents[intent], query, intent);
     if (view) intents.push(view);
   }
-  return { offers: model.offers, week: model.week, intents };
+  const net = ensureModelNet(model);
+  return { offers: model.offers, week: model.week, steps: net.steps, loss: net.loss, intents };
 }

@@ -554,10 +554,13 @@ export function AngeboteApp() {
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
               <span>Мозг акций</span>
-              <span className="text-muted">{brain && brain.offers > 0 ? brain.offers : "учится"}</span>
+              <span className="text-muted">
+                {brain && brain.steps > 0 ? `${brain.steps} шагов` : "учится"}
+              </span>
             </summary>
             <p className="text-sm text-muted">
-              Читает названия из листовок и запоминает, как магазины называют товар. В новую среду старые примеры слабеют, свежий ассортимент перевешивает.
+              Нейросеть, не список. На каждом названии из листовки делает шаг обучения и выдаёт вероятность: тот это товар или похожий. В новую среду веса слабеют вдвое.
+              {brain && brain.steps > 0 ? ` Ошибка сейчас ${brain.loss.toFixed(2)}.` : ""}
             </p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">
