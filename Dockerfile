@@ -3,6 +3,7 @@ WORKDIR /app
 COPY webapp/package*.json ./
 RUN npm install --no-save --package-lock=false
 COPY webapp/ ./
+ENV NITRO_PRESET=node-server
 RUN npm run typecheck && npx vite build
 
 FROM node:22-bookworm-slim
