@@ -41,6 +41,7 @@ type RawOffer = {
   validTo?: string;
   product?: { name?: string | null };
   name?: string | null;
+  categories?: { name?: string | null }[];
 };
 
 function formatDate(value?: string | null): string {
@@ -121,6 +122,7 @@ function parseOffer(
     imageUrl: offerId ? imageTemplate.replace("{offer_id}", String(offerId)) : "",
     relevance,
     onlineOnly: /nur online|online verfügbar/.test(blob),
+    category: entry.categories?.[0]?.name ?? "",
   };
 }
 

@@ -36,6 +36,7 @@ type State = {
   country: CountryCode;
   zip: string;
   retailers: string[];
+  categories: string[];
   scans: Record<string, LastScan>;
   createList: (name: string) => boolean;
   deleteList: (id: string) => void;
@@ -46,6 +47,8 @@ type State = {
   setZip: (zip: string) => void;
   toggleRetailer: (name: string) => void;
   clearRetailers: () => void;
+  toggleCategory: (id: string) => void;
+  clearCategories: () => void;
   setLastScan: (scan: LastScan) => void;
 };
 
@@ -61,6 +64,7 @@ export const useAngebote = create<State>()(
       country: "de",
       zip: "",
       retailers: [],
+      categories: [],
       scans: {},
       createList: (name) => {
         const trimmed = name.trim().replace(/\s+/g, " ");
@@ -134,6 +138,13 @@ export const useAngebote = create<State>()(
         });
       },
       clearRetailers: () => set({ retailers: [] }),
+      toggleCategory: (id) => {
+        const current = get().categories;
+        set({
+          categories: current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+        });
+      },
+      clearCategories: () => set({ categories: [] }),
       setLastScan: (scan) => {
         const id = activeOf(get())?.id;
         if (!id) return;
@@ -163,6 +174,7 @@ export const useAngebote = create<State>()(
         country: state.country,
         zip: state.zip,
         retailers: state.retailers,
+        categories: state.categories,
         scans: state.scans,
       }),
     },

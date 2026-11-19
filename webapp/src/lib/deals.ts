@@ -11,6 +11,7 @@ export type Deal = {
   imageUrl: string;
   relevance: number;
   onlineOnly: boolean;
+  category: string;
 };
 
 export type ItemScan = {

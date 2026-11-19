@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
-import { suggestProducts } from "@/lib/products";
+import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { scanQuery } from "@/lib/scan";
 import { useAngebote, type LastScan } from "@/lib/store";
 
@@ -140,6 +140,7 @@ export function AngeboteApp() {
   const country = useAngebote((s) => s.country);
   const zip = useAngebote((s) => s.zip);
   const retailers = useAngebote((s) => s.retailers);
+  const categories = useAngebote((s) => s.categories);
   const scans = useAngebote((s) => s.scans);
   const createList = useAngebote((s) => s.createList);
   const deleteList = useAngebote((s) => s.deleteList);
@@ -150,6 +151,8 @@ export function AngeboteApp() {
   const setZip = useAngebote((s) => s.setZip);
   const toggleRetailer = useAngebote((s) => s.toggleRetailer);
   const clearRetailers = useAngebote((s) => s.clearRetailers);
+  const toggleCategory = useAngebote((s) => s.toggleCategory);
+  const clearCategories = useAngebote((s) => s.clearCategories);
   const setLastScan = useAngebote((s) => s.setLastScan);
 
   const active = lists.find((list) => list.id === activeListId) ?? lists[0];
@@ -168,7 +171,7 @@ export function AngeboteApp() {
   const [listDraft, setListDraft] = useState("");
   const [listNote, setListNote] = useState("");
 
-  const matches = suggestProducts(draft);
+  const matches = suggestProducts(draft, categories);
   const showSuggest = focused && matches.length > 0;
 
   useEffect(() => {
@@ -224,8 +227,14 @@ export function AngeboteApp() {
     setProgress("");
   }
 
+  const visibleItems = items.filter((item) => inCategories(item.name, categories));
   const hits = lastScan
-    ? items.reduce((sum, item) => sum + (lastScan.byItem[item.name]?.length ?? 0), 0)
+    ? visibleItems.reduce((sum, item) => {
+        const deals = (lastScan.byItem[item.name] ?? []).filter((deal) =>
+          dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
+        );
+        return sum + deals.length;
+      }, 0)
     : 0;
 
   return (
@@ -368,6 +377,40 @@ export function AngeboteApp() {
           </form>
 
           <div className="mt-4">
+            <p className="text-sm text-muted">Категории</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                className={
+                  categories.length === 0
+                    ? "h-11 shrink-0 bg-ink px-3 text-sm text-paper"
+                    : "h-11 shrink-0 border border-line px-3 text-sm"
+                }
+                onClick={clearCategories}
+              >
+                Все
+              </button>
+              {CATEGORIES.map((category) => {
+                const on = categories.includes(category.id);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={
+                      on
+                        ? "h-11 shrink-0 bg-ink px-3 text-sm text-paper"
+                        : "h-11 shrink-0 border border-line px-3 text-sm"
+                    }
+                    onClick={() => toggleCategory(category.id)}
+                  >
+                    {category.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm text-muted">Списки</p>
               {lists.length > 1 && active ? (
@@ -443,7 +486,7 @@ export function AngeboteApp() {
 
           {items.length === 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              {SUGGESTIONS.map((name) => (
+              {(categories.length > 0 ? productsIn(categories) : SUGGESTIONS).map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -492,20 +535,29 @@ export function AngeboteApp() {
           </details>
 
           <ul className="mt-4 divide-y divide-line border-t border-line">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="min-w-0 truncate">{item.name}</span>
-                <button
-                  type="button"
-                  className="grid size-11 shrink-0 place-items-center text-muted"
-                  aria-label={`Убрать ${item.name}`}
-                  onClick={() => removeItem(item.id)}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </li>
-            ))}
+            {items.filter((item) => inCategories(item.name, categories)).map((item) => {
+              const cat = categoryOf(item.name);
+              return (
+                <li key={item.id} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0 truncate">
+                    {item.name}
+                    {cat ? <span className="ml-2 text-xs text-muted">{categoryLabel(cat)}</span> : null}
+                  </span>
+                  <button
+                    type="button"
+                    className="grid size-11 shrink-0 place-items-center text-muted"
+                    aria-label={`Убрать ${item.name}`}
+                    onClick={() => removeItem(item.id)}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+          {ready && items.length > 0 && items.every((item) => !inCategories(item.name, categories)) ? (
+            <p className="py-4 text-sm text-muted">В этой категории в списке пусто.</p>
+          ) : null}
           {ready && items.length === 0 ? (
             <p className="py-6 text-sm text-muted">
               Добавьте товары, которые покупаете регулярно. Приложение спросит Marktguru, нет ли их сейчас в проспекте.
@@ -527,13 +579,16 @@ export function AngeboteApp() {
             </p>
           ) : null}
 
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const known = lastScan != null && Object.prototype.hasOwnProperty.call(lastScan.byItem, item.name);
+            const deals = (known ? (lastScan?.byItem[item.name] ?? []) : []).filter((deal) =>
+              dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
+            );
             return (
               <ItemResults
                 key={item.id}
                 item={item.name}
-                deals={known ? (lastScan?.byItem[item.name] ?? []) : []}
+                deals={deals}
                 error={known && !scanning ? (lastScan?.errors[item.name] ?? null) : null}
                 known={known}
                 scanning={scanning}
