@@ -3,7 +3,7 @@ import { exactQueryFor } from "./exact.ts";
 import type { ProductExample } from "./product-net.ts";
 /** Explicit reviewed=true is required; unreviewed exported suggestions are skipped. */
 export function parseReviewedExamples(content: string): ProductExample[] {
-  if (content.length > 10_000_000) throw new Error("Review file exceeds 10 MB");
+  if (Buffer.byteLength(content, "utf8") > 10_000_000) throw new Error("Review file exceeds 10 MB");
   const rows: ProductExample[] = [];
   for (const [index, line] of content.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;

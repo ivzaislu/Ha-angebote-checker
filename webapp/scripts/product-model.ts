@@ -124,7 +124,7 @@ try {
       );
       const net = champion?.net ?? seed.net;
       const rows = weak
-        .filter((row) => !existing.has(exampleKey(row)))
+        .filter((row) => row.description.length<=600 && row.category.length<=180 && !existing.has(exampleKey(row)))
         .map((row) => ({ ...row, reviewed: false, modelScore: productProbability(net, row) }))
         .sort((a, b) => Math.abs(a.modelScore - 0.5) - Math.abs(b.modelScore - 0.5))
         .slice(0, 100);
@@ -149,9 +149,11 @@ try {
           let content = "";
           if (path === "-") {
             process.stdin.setEncoding("utf8");
+            let bytes = 0;
             for await (const chunk of process.stdin) {
+              bytes += Buffer.byteLength(chunk, "utf8");
               content += chunk;
-              if (content.length > 10_000_000) throw new Error("Review file exceeds 10 MB");
+              if (bytes > 10_000_000) throw new Error("Review file exceeds 10 MB");
             }
           } else content = await readFile(path, "utf8");
           reviewed = parseReviewedExamples(content);

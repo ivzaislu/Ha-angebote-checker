@@ -153,6 +153,7 @@ test("empty/one-class validation and regressing candidates cannot pass the gate"
 });
 
 test("review suggestions are never silently treated as human labels", () => {
+  assert.throws(()=>parseReviewedExamples("ü".repeat(5_000_001)),/exceeds 10 MB/);
   const row = {
     intent: "Haferdrink",
     name: "Haferdrink",
