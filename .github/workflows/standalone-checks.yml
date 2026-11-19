@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: webapp/package-lock.json
       - run: npm install --no-save --package-lock=false
         # Existing package-lock.json is inconsistent with package.json; avoid blocking checks.
+      - name: Validate deployment scripts
+        run: bash -n ../deploy/install.sh ../deploy/update.sh
       - run: npm run typecheck
       # Repository-wide tests currently depend on untracked .grok skills and app-env fixtures.
       # Run the self-contained regression suite until those fixtures are restored.
