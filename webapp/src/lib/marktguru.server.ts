@@ -3,6 +3,7 @@ import { relevanceScore, type Deal } from "@/lib/deals";
 import { offerFits } from "@/lib/exact";
 import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
 import { gatherLessons } from "@/lib/corpus.server";
+import { rememberProducts } from "@/lib/product-knowledge.server";
 
 const UA = "Mozilla/5.0";
 
@@ -175,6 +176,13 @@ export async function searchDeals(input: {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
   const raw = await fetchRaw(input.country, input.zip, input.query, false);
+  await rememberProducts(input.country, raw.map((entry) => ({
+    name: entry.product?.name || entry.name || "",
+    category: entry.categories?.[0]?.name ?? "",
+    retailer: entry.advertisers?.[0]?.name || entry.retailerName || "",
+    offerId: entry.id,
+    price: entry.price,
+  }))).catch((err) => console.error("product catalog", err));
   const lessons: OfferLesson[] = raw.map((entry) => ({
     name: entry.product?.name || entry.name || "",
     description: entry.description || "",
