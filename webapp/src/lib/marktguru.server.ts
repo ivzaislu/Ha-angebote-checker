@@ -5,6 +5,8 @@ import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesso
 import { gatherLessons } from "@/lib/corpus.server";
 import { rememberProducts } from "@/lib/product-knowledge.server";
 import { inferUnitPrice } from "@/lib/unit-price";
+import { archiveOffers } from "@/lib/offer-archive";
+import { getSql } from "@/lib/db";
 import { compatibleSalmon } from "@/lib/product-variants";
 
 const UA = "Mozilla/5.0";
@@ -179,6 +181,7 @@ export async function searchDeals(input: {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
   const raw = await fetchRaw(input.country, input.zip, input.query, false);
+  await archiveOffers(await getSql(), input.country, input.zip, raw);
   await rememberProducts(input.country, raw.map((entry) => ({
     name: entry.product?.name || entry.name || "",
     category: entry.categories?.[0]?.name ?? "",
@@ -226,14 +229,17 @@ export async function studyLeaflets(input: {
   country: CountryCode;
   zip: string;
 }): Promise<{ offers: number; already: boolean }> {
+  if (input.country !== "de") throw new Error("Архив листовок пока доступен только для Германии");
+  // Archive every requested region, even when the model has already studied this week.
   const status = await rememberWeek();
-  if (status.already) return { offers: status.offers, already: true };
   try {
-    const lessons = await gatherLessons(input.zip, (offers) => rememberProducts(input.country, offers));
-    await learnLessons(lessons);
+    const lessons = await gatherLessons(input.zip, (offers) => rememberProducts(input.country, offers),
+      async (offers) => { await archiveOffers(await getSql(), "de", input.zip, offers); });
+    if (!status.already) await learnLessons(lessons);
   } catch (err) {
     console.error("leaflet study", err);
+    throw err;
   }
   const view = await snapshotFor([]);
-  return { offers: view.offers, already: false };
+  return { offers: view.offers, already: status.already };
 }

@@ -76,3 +76,16 @@ export const productHints = createServerFn({ method: "POST" })
     const { knownProductHints } = await import("@/lib/product-knowledge.server");
     return knownProductHints(data.country, data.prefix);
   });
+
+/** Locally archived observations, including expired offers, sorted from min to max. */
+export const archivedPriceHistory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({
+    country: z.enum(["de", "at"]), name: z.string().min(3).max(180),
+    zip: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    if (data.zip !== undefined) place(data.country, data.zip);
+    const { getSql } = await import("@/lib/db");
+    const { priceHistory } = await import("@/lib/offer-archive");
+    return priceHistory(await getSql(), data.country, data.name, data.zip);
+  });

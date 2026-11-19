@@ -3,3 +3,6 @@ node_modules/
 dist/
 .nitro/
 *.log
+.output/
+.test-tmp/
+training-candidates.jsonl

@@ -14,8 +14,9 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import { archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import type { BrainView } from "@/lib/brain";
+import { recognizeVariant } from "@/lib/product-variants";
 import { useAngebote, type LastScan } from "@/lib/store";
 import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
 
@@ -28,6 +29,63 @@ function formatWhen(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function VariantLabels({ name, description }: { name: string; description: string }) {
+  const variant = recognizeVariant(name, description);
+  const labels: Record<string, string> = {
+    salmon: "лосось", "smoked-salmon": "копчёный лосось", pollock: "сейлахс",
+    "salmon-ham": "ветчина", oat: "овсяный напиток", soy: "соевый напиток",
+    almond: "миндальный напиток", buttermilk: "пахта", uht: "длительного хранения",
+    fresh: "свежее", organic: "Bio", "lactose-free": "без лактозы",
+    vegan: "vegan", frozen: "замороженное", assorted: "разные сорта",
+  };
+  const tags = [variant.kind, ...variant.attributes].filter((tag): tag is string => Boolean(tag));
+  if (!tags.length) return null;
+  return <p className="mt-1 text-xs text-muted">{tags.map(tag => labels[tag] ?? (tag.startsWith("fat:") ? `жирность ${tag.slice(4)}` : tag)).join(" · ")}</p>;
+}
+
+function ArchivedHistory({ name }: { name: string }) {
+  const country = useAngebote(state => state.country);
+  const load = useServerFn(archivedPriceHistory);
+  const [data, setData] = useState<Awaited<ReturnType<typeof archivedPriceHistory>> | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setData(null); setOpen(false); setError(""); }, [country, name]);
+  async function show() {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    setBusy(true);
+    setError("");
+    try { setData(await load({ data: { country, name } })); }
+    catch { setError("Не удалось загрузить архив цен"); }
+    finally { setBusy(false); }
+  }
+  return <div className="mt-2 text-xs">
+    <button type="button" className="underline" onClick={show} disabled={busy} aria-expanded={open}>
+      {busy ? "Загрузка архива…" : "История цен"}
+    </button>
+    {open && <div className="mt-2 space-y-2">
+      {error && <p role="alert">{error}</p>}
+      {data && (data.observations === 0 ? <p>В архиве пока нет цен этого товара.</p> : <>
+        <p>От {data.minimum} до {data.maximum} € · наблюдений: {data.observations}</p>
+        <p className="text-muted">Сохранённые акции по стране, включая истёкшие. Фасовки и разновидности могут отличаться; это не текущая цена магазина.</p>
+        <div className="max-h-56 overflow-auto">
+          <table className="w-full text-left">
+            <caption className="sr-only">Цены от минимальной до максимальной</caption>
+            <thead><tr><th>Цена</th><th>Магазин / индекс</th><th>Срок / фасовка / описание</th></tr></thead>
+            <tbody>{data.rows.map(row => <tr key={row.snapshot_id}>
+              <td className="py-1 pr-2">{row.price} €{row.unit_price ? ` · ${row.unit_price} €/${row.unit}` : ""}</td>
+              <td className="pr-2">{row.retailer || "Неизвестно"} · {row.zip}</td>
+              <td>{row.valid_from.slice(0,10) || "?"} – {row.valid_to.slice(0,10) || "?"}{row.quantity ? ` · ${row.quantity} ${row.unit}` : ""}<p>{row.description}</p></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {data.truncated && <p>Показаны первые 500 записей. Диапазон учитывает весь архив.</p>}
+      </>)}
+    </div>}
+  </div>;
 }
 
 function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
@@ -74,6 +132,8 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
             ? `${deal.productName} · ${deal.description}`
             : deal.description || deal.productName}
         </p>
+        <VariantLabels name={deal.productName} description={deal.description} />
+        <ArchivedHistory name={deal.productName || deal.description} />
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {dates ? (
             <span className="inline-flex items-center gap-1">
