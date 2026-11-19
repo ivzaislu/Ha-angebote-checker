@@ -1,5 +1,5 @@
 import { hardReject, offerFits } from "@/lib/exact";
-import { applyNetDecision, createNet, decayNet, netReady, predict, trainLessons, type Net } from "@/lib/net";
+import { applyNetDecision, createNet, netReady, predict, trainLessons, type Net } from "@/lib/net";
 
 export type SeenName = { name: string; n: number };
 
@@ -134,13 +134,28 @@ export function rollWeek(model: BrainModel, week: string): void {
         return n > 0 ? [{ ...entry, n }] : [];
       });
     }
-    if (netReady(model.net)) decayNet(model.net);
   }
   if (week) model.week = week;
   prune(model);
 }
 
-export function learn(model: BrainModel, lessons: Lesson[]): void {
+export function balanceLessons(lessons: Lesson[]): Lesson[] {
+  const byIntent = new Map<string, { yes: Lesson[]; no: Lesson[] }>();
+  for (const lesson of lessons) {
+    const bucket = byIntent.get(lesson.intent) ?? { yes: [], no: [] };
+    byIntent.set(lesson.intent, bucket);
+    (lesson.positive ? bucket.yes : bucket.no).push(lesson);
+  }
+  const balanced: Lesson[] = [];
+  for (const bucket of byIntent.values()) {
+    if (bucket.yes.length === 0) continue;
+    balanced.push(...bucket.yes);
+    balanced.push(...bucket.no.slice(0, bucket.yes.length * 2));
+  }
+  return balanced;
+}
+
+export function learn(model: BrainModel, lessons: Lesson[], passes = 4, lr = 0.35): void {
   for (const lesson of lessons) {
     const intent = lesson.intent.trim();
     const name = lesson.name.trim();
@@ -167,6 +182,8 @@ export function learn(model: BrainModel, lessons: Lesson[]): void {
         text: `${lesson.name} ${lesson.category}`,
         positive: lesson.positive,
       })),
+    passes,
+    lr,
   );
   prune(model);
 }

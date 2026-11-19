@@ -1,7 +1,8 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
 import { offerFits } from "@/lib/exact";
-import { observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
+import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
+import { gatherLessons } from "@/lib/corpus.server";
 
 const UA = "Mozilla/5.0";
 
@@ -209,52 +210,19 @@ export async function searchDeals(input: {
   return deals;
 }
 
-const PROBES = [
-  "Milch",
-  "Käse",
-  "Butter",
-  "Joghurt",
-  "Brot",
-  "Eier",
-  "Fleisch",
-  "Fisch",
-  "Apfel",
-  "Gurke",
-  "Kaffee",
-  "Wasser",
-  "Nudeln",
-  "Reis",
-  "Bier",
-  "Toilettenpapier",
-];
-
-/** Read this week's leaflets once, so the learner sees more than the shopping list. */
+/** Read this week's leaflets and any older brochures still in the archive. */
 export async function studyLeaflets(input: {
   country: CountryCode;
   zip: string;
 }): Promise<{ offers: number; already: boolean }> {
   const status = await rememberWeek();
   if (status.already) return { offers: status.offers, already: true };
-
-  const queue = [...PROBES];
-  const workers = Array.from({ length: 4 }, async () => {
-    while (queue.length > 0) {
-      const query = queue.shift();
-      if (!query) return;
-      try {
-        const raw = await fetchRaw(input.country, input.zip, query, false);
-        const offers: OfferLesson[] = raw.map((entry) => ({
-          name: entry.product?.name || entry.name || "",
-          description: entry.description || "",
-          category: entry.categories?.[0]?.name ?? "",
-        }));
-        await observeOffers(query, offers);
-      } catch (err) {
-        console.error("leaflet study", query, err);
-      }
-    }
-  });
-  await Promise.all(workers);
+  try {
+    const lessons = await gatherLessons(input.zip);
+    await learnLessons(lessons);
+  } catch (err) {
+    console.error("leaflet study", err);
+  }
   const view = await snapshotFor([]);
   return { offers: view.offers, already: false };
 }

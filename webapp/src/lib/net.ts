@@ -122,7 +122,7 @@ function clip(value: number): number {
 }
 
 /** One stochastic gradient step on binary cross-entropy. Returns the loss. */
-export function trainExample(net: Net, intent: string, text: string, positive: boolean): number {
+export function trainExample(net: Net, intent: string, text: string, positive: boolean, lr = LEARNING_RATE): number {
   const input = features(intent, text);
   const target = positive ? 1 : 0;
   const { probability, hidden, activated } = forward(net, input);
@@ -132,15 +132,15 @@ export function trainExample(net: Net, intent: string, text: string, positive: b
 
   for (let row = 0; row < NET_HIDDEN; row += 1) {
     const hiddenDelta = hidden[row] > 0 ? delta * net.w2[row] : 0;
-    net.w2[row] = clip(net.w2[row] - LEARNING_RATE * delta * activated[row]);
-    net.b1[row] = clip(net.b1[row] - LEARNING_RATE * hiddenDelta);
+    net.w2[row] = clip(net.w2[row] - lr * delta * activated[row]);
+    net.b1[row] = clip(net.b1[row] - lr * hiddenDelta);
     const offset = row * NET_IN;
     for (let col = 0; col < NET_IN; col += 1) {
       if (input[col] === 0) continue;
-      net.w1[offset + col] = clip(net.w1[offset + col] - LEARNING_RATE * hiddenDelta * input[col]);
+      net.w1[offset + col] = clip(net.w1[offset + col] - lr * hiddenDelta * input[col]);
     }
   }
-  net.b2 = clip(net.b2 - LEARNING_RATE * delta);
+  net.b2 = clip(net.b2 - lr * delta);
   net.steps += 1;
   net.loss = net.steps === 1 ? loss : net.loss * 0.95 + loss * 0.05;
   return loss;
@@ -150,12 +150,13 @@ export function trainLessons(
   net: Net,
   lessons: { intent: string; text: string; positive: boolean }[],
   passes = 4,
+  lr = LEARNING_RATE,
 ): void {
   if (lessons.length === 0) return;
   for (let pass = 0; pass < passes; pass += 1) {
     for (const lesson of lessons) {
-      trainExample(net, lesson.intent, lesson.text, lesson.positive);
-      if (lesson.positive) trainExample(net, lesson.intent, lesson.text, true);
+      trainExample(net, lesson.intent, lesson.text, lesson.positive, lr);
+      if (lesson.positive) trainExample(net, lesson.intent, lesson.text, true, lr);
     }
   }
 }

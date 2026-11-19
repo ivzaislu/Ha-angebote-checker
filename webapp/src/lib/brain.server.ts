@@ -1,4 +1,5 @@
-import { decideOffer, emptyBrain, ensureModelNet, intentView, learn, rollWeek, suggestFromModel, type BrainModel, type BrainView, type FlyerHint, type Lesson } from "@/lib/brain";
+import { balanceLessons, decideOffer, ensureModelNet, intentView, learn, rollWeek, suggestFromModel, type BrainModel, type BrainView, type FlyerHint, type Lesson } from "@/lib/brain";
+import trainedBrain from "@/lib/trained-brain.json";
 import { getSql } from "@/lib/db";
 import { exactQueryFor, offerFits } from "@/lib/exact";
 import { flyerWeekStart } from "@/lib/week";
@@ -52,23 +53,33 @@ function weekKey(now = new Date()): string {
   return `${start.getFullYear()}-${month}-${day}`;
 }
 
+function seedModel(): BrainModel {
+  const model = structuredClone(trainedBrain) as unknown as BrainModel;
+  ensureModelNet(model);
+  return model;
+}
+
 async function readModel(): Promise<BrainModel> {
   if (brainGlobal.__offerBrain) return brainGlobal.__offerBrain;
   const sql = await getSql();
   const rows = await sql.query<{ model: string }>("select model from offer_brain where id = $1", ["main"]);
+  const seed = seedModel();
   if (!rows[0]?.model) {
-    brainGlobal.__offerBrain = emptyBrain();
-    return brainGlobal.__offerBrain;
+    brainGlobal.__offerBrain = seed;
+    await writeModel(seed).catch(() => undefined);
+    return seed;
   }
   try {
     const parsed = JSON.parse(rows[0].model) as BrainModel;
-    if (!parsed?.intents) brainGlobal.__offerBrain = emptyBrain();
-    else {
-      ensureModelNet(parsed);
-      brainGlobal.__offerBrain = parsed;
+    if (!parsed?.intents || !parsed.net || parsed.net.steps < seed.net.steps) {
+      brainGlobal.__offerBrain = seed;
+      await writeModel(seed).catch(() => undefined);
+      return seed;
     }
+    ensureModelNet(parsed);
+    brainGlobal.__offerBrain = parsed;
   } catch {
-    brainGlobal.__offerBrain = emptyBrain();
+    brainGlobal.__offerBrain = seed;
   }
   return brainGlobal.__offerBrain;
 }
@@ -105,12 +116,20 @@ export async function observeOffers(
 ): Promise<Array<{ keep: boolean; fromBrain: boolean }>> {
   const lessons = lessonsFor(query, offers);
   return locked(async (model) => {
-    learn(model, lessons);
+    learn(model, lessons, 1, 0.05);
     await writeModel(model);
     return offers.map((offer) => decideObserved(model, query, offer));
   });
 }
 
+export async function learnLessons(lessons: Lesson[]): Promise<number> {
+  const balanced = balanceLessons(lessons);
+  return locked(async (model) => {
+    learn(model, balanced, 2, 0.12);
+    await writeModel(model);
+    return model.net.steps;
+  });
+}
 export async function rememberWeek(): Promise<{ week: string; already: boolean; offers: number }> {
   const week = weekKey();
   return locked(async (model) => {
@@ -132,8 +151,9 @@ export async function snapshotFor(queries: string[]): Promise<BrainView> {
   const model = await readModel();
   const intents = [];
   const seen = new Set<string>();
-  for (const query of queries) {
-    const intent = intentOf(query);
+  const asked = queries.length > 0 ? queries : Object.keys(model.intents);
+  for (const query of asked) {
+    const intent = queries.length > 0 ? intentOf(query) : query;
     if (!intent || seen.has(intent)) continue;
     seen.add(intent);
     const view = intentView(model.intents[intent], query, intent);
