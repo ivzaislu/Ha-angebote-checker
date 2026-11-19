@@ -7,6 +7,10 @@ export type ExactQuery = {
   reject: string[];
   /** Category alone is too broad, the name has to be this product too. */
   requireName: boolean;
+  /** Match Lachs inside Lachsfilet, but not as a loose substring of another food. */
+  stem?: boolean;
+  /** At least one of these must show up in the name or description. */
+  need?: string[];
 };
 
 /**
@@ -91,8 +95,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
     means: "сыр",
     not: ["Crème fraîche", "чизкейк", "соус"],
     acceptCategories: ["kase"],
-    aliases: ["gouda", "feta", "mozzarella", "emmentaler", "frischkase"],
-    reject: ["fraiche", "kuchen", "sauce", "aufstrich"],
+    aliases: [],
+    reject: ["fraiche", "kuchen", "sauce", "aufstrich", "quark"],
     requireName: false,
   },
   {
@@ -280,7 +284,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     means: "пиво",
     not: ["декоративная миниатюра"],
     acceptCategories: ["bier", "alkoholfreies"],
-    aliases: ["pils", "helles", "weizenbier"],
+    aliases: ["pils", "helles"],
     reject: ["miniatur", "deko"],
     requireName: false,
   },
@@ -289,8 +293,36 @@ export const EXACT_QUERIES: ExactQuery[] = [
     means: "вино",
     not: ["глинтвейн", "игристое", "аперитив"],
     acceptCategories: ["wein", "rotweine", "weissweine", "roseweine"],
-    aliases: ["rotwein", "weisswein"],
+    aliases: [],
     reject: ["gluh", "sekt", "bowle", "aperitif", "spritz", "met"],
+    requireName: false,
+  },
+  {
+    query: "Weizenbier",
+    means: "пшеничное пиво",
+    not: ["пильзнер", "радлер"],
+    acceptCategories: ["bier"],
+    aliases: ["weissbier"],
+    reject: ["pils", "radler", "miniatur"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Rotwein",
+    means: "красное вино",
+    not: ["белое", "глинтвейн", "игристое"],
+    acceptCategories: ["rotweine"],
+    aliases: [],
+    reject: ["gluh", "sekt", "weiss"],
+    requireName: false,
+  },
+  {
+    query: "Weißwein",
+    means: "белое вино",
+    not: ["красное", "глинтвейн"],
+    acceptCategories: ["weissweine"],
+    aliases: ["weisswein"],
+    reject: ["gluh", "sekt"],
     requireName: false,
   },
   {
@@ -301,6 +333,374 @@ export const EXACT_QUERIES: ExactQuery[] = [
     aliases: ["eiscreme"],
     reject: ["eisberg", "salat", "eier", "likor"],
     requireName: false,
+  },
+  {
+    query: "Fisch",
+    means: "рыба",
+    not: ["палочки", "салат", "креветки", "лампы", "велосипед"],
+    acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch", "marinierter", "fischkonserven"],
+    aliases: [],
+    reject: ["stabchen", "salat", "garnele", "muschel", "octopus", "leuchte", "lampe", "bike", "fahrrad"],
+    requireName: false,
+  },
+  {
+    query: "Lachs",
+    means: "лосось",
+    not: ["Seelachs", "Lachsschinken", "баранина", "форель", "пирог"],
+    acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch", "marinierter"],
+    aliases: ["lachsfilet"],
+    reject: ["seelachs", "schinken", "kasseler", "lamm", "forelle", "aufstrich", "blatterteig"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Räucherlachs",
+    means: "копчёный лосось",
+    not: ["сайда", "ветчина"],
+    acceptCategories: ["raucherfisch"],
+    aliases: ["stremellachs", "wildlachs"],
+    reject: ["seelachs", "schinken", "forelle"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Seelachs",
+    means: "сайда, это не лосось",
+    not: ["лосось"],
+    acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch", "fischkonserven"],
+    aliases: [],
+    reject: ["raucherlachs", "schinken"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Thunfisch",
+    means: "тунец",
+    not: ["салат с тунцом", "лосось"],
+    acceptCategories: ["fischkonserven", "frischfisch", "tiefkuhlfisch"],
+    aliases: ["thunfischfilet"],
+    reject: ["salat", "lachs"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Hering",
+    means: "сельдь",
+    not: ["лосось", "креветки"],
+    acceptCategories: ["fischkonserven", "marinierter", "raucherfisch", "fischsalate"],
+    aliases: ["heringsfilet", "matjes"],
+    reject: ["lachs", "garnele"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Garnelen",
+    means: "креветки",
+    not: ["рыба", "мидии", "осьминог"],
+    acceptCategories: ["meeresfruchte", "tiefkuhlfisch"],
+    aliases: ["garnele"],
+    reject: ["muschel", "octopus", "stabchen", "lachs"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Fischstäbchen",
+    means: "рыбные палочки",
+    not: ["филе", "креветки"],
+    acceptCategories: ["tiefkuhlfisch", "tiefkuhlgerichte"],
+    aliases: [],
+    reject: ["garnele", "lachs"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Forelle",
+    means: "форель",
+    not: ["сайда"],
+    acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch"],
+    aliases: ["lachsforelle"],
+    reject: ["seelachs"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Rotbarsch",
+    means: "морской окунь",
+    not: ["лосось", "палочки"],
+    acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch"],
+    aliases: [],
+    reject: ["lachs", "stabchen"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Schellfisch",
+    means: "пикша",
+    not: ["лосось", "треска", "палочки"],
+    acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch"],
+    aliases: [],
+    reject: ["lachs", "kabeljau", "dorsch", "stabchen"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Kabeljau",
+    means: "треска",
+    not: ["пикша", "лосось", "палочки"],
+    acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch", "fischkonserven"],
+    aliases: ["dorsch"],
+    reject: ["schellfisch", "lachs", "stabchen"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Dorade",
+    means: "дорада",
+    not: ["лосось", "окунь"],
+    acceptCategories: ["frischfisch", "tiefkuhlfisch"],
+    aliases: [],
+    reject: ["lachs", "barsch"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Muscheln",
+    means: "мидии",
+    not: ["креветки", "осьминог"],
+    acceptCategories: ["meeresfruchte", "tiefkuhlfisch"],
+    aliases: ["miesmuscheln"],
+    reject: ["garnele", "octopus"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Hähnchen",
+    means: "курица",
+    not: ["наггетсы", "колбаса", "приправа"],
+    acceptCategories: ["geflugel", "mariniertes", "tiefkuhlfleisch", "tiefkuhlgerichte"],
+    aliases: [],
+    reject: ["nugget", "wurst", "wiener", "gewurz", "aspik"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Hähnchenbrust",
+    means: "куриная грудка",
+    not: ["окорочка", "наггетсы", "колбаса"],
+    acceptCategories: ["geflugel", "mariniertes", "tiefkuhlfleisch", "tiefkuhlgerichte"],
+    aliases: ["brustfilet"],
+    reject: ["schenkel", "nugget", "wurst", "gewurz", "keule", "pute"],
+    requireName: true,
+    stem: true,
+    need: ["brust", "innenfilet"],
+  },
+  {
+    query: "Pute",
+    means: "индейка",
+    not: ["курица", "колбаса"],
+    acceptCategories: ["geflugel", "tiefkuhlfleisch"],
+    aliases: ["puten"],
+    reject: ["wurst", "hahnchen"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Hackfleisch",
+    means: "фарш",
+    not: ["колбаса"],
+    acceptCategories: ["hackfleisch"],
+    aliases: [],
+    reject: ["wurst"],
+    requireName: false,
+  },
+  {
+    query: "Rinderhack",
+    means: "говяжий фарш",
+    not: ["свиной фарш", "смешанный фарш"],
+    acceptCategories: ["hackfleisch"],
+    aliases: ["rinderhackfleisch"],
+    reject: ["schwein", "gemischt"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Wurst",
+    means: "колбаса и сосиски",
+    not: ["пицца", "круассан"],
+    acceptCategories: ["wurste", "wurstaufschnitt", "koch"],
+    aliases: [],
+    reject: ["pizza", "croissant"],
+    requireName: false,
+  },
+  {
+    query: "Leberwurst",
+    means: "ливерная колбаса",
+    not: ["сосиски", "ветчина"],
+    acceptCategories: ["koch", "wurste", "wurstaufschnitt"],
+    aliases: [],
+    reject: ["pizza", "schinken"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Salami",
+    means: "салями",
+    not: ["ветчина", "сосиски"],
+    acceptCategories: ["wurste", "wurstaufschnitt", "wurst"],
+    aliases: [],
+    reject: ["schinken"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Schinken",
+    means: "ветчина",
+    not: ["круассан", "шницель", "палачинки"],
+    acceptCategories: ["schinken"],
+    aliases: [],
+    reject: ["croissant", "schnitzel", "palatschinken", "pizza", "wurst"],
+    requireName: false,
+  },
+  {
+    query: "Gouda",
+    means: "сыр гауда",
+    not: ["моцарелла", "фета", "пармезан"],
+    acceptCategories: ["kase"],
+    aliases: [],
+    reject: ["mozzarella", "feta", "parmesan"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Feta",
+    means: "фета",
+    not: ["гауда", "моцарелла"],
+    acceptCategories: ["kase"],
+    aliases: ["hirtenkase"],
+    reject: ["gouda", "mozzarella", "parmesan"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Mozzarella",
+    means: "моцарелла",
+    not: ["гауда", "фета"],
+    acceptCategories: ["kase"],
+    aliases: [],
+    reject: ["gouda", "feta", "parmesan"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Parmesan",
+    means: "пармезан",
+    not: ["гауда", "моцарелла"],
+    acceptCategories: ["kase"],
+    aliases: ["parmigiano"],
+    reject: ["gouda", "feta", "mozzarella"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Frischkäse",
+    means: "сливочный сыр",
+    not: ["твёрдый сыр", "кварк"],
+    acceptCategories: ["kase"],
+    aliases: [],
+    reject: ["gouda", "quark", "parmesan"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Quark",
+    means: "кварк",
+    not: ["сыр", "десертный крем"],
+    acceptCategories: ["kase"],
+    aliases: ["topfen"],
+    reject: ["gouda", "frischkase"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Kaffee",
+    means: "кофе",
+    not: ["кофемашина", "сервиз"],
+    acceptCategories: ["kaffee"],
+    aliases: [],
+    reject: ["maschine", "vollautomat", "service", "geschirr"],
+    requireName: false,
+  },
+  {
+    query: "Kaffeebohnen",
+    means: "кофе в зёрнах",
+    not: ["молотый", "капсулы", "кофемашина"],
+    acceptCategories: ["kaffee"],
+    aliases: [],
+    reject: ["kapsel", "pads", "loslich", "maschine", "gemahlen"],
+    requireName: true,
+    stem: true,
+    need: ["bohnen", "bohne"],
+  },
+  {
+    query: "Filterkaffee",
+    means: "молотый кофе",
+    not: ["капсулы", "кофемашина"],
+    acceptCategories: ["kaffee"],
+    aliases: [],
+    reject: ["kapsel", "pads", "maschine", "loslich"],
+    requireName: true,
+    stem: true,
+    need: ["gemahlen", "filter"],
+  },
+  {
+    query: "Tee",
+    means: "чай",
+    not: ["чайный набор"],
+    acceptCategories: ["tee"],
+    aliases: ["schwarztee"],
+    reject: ["set", "kanne"],
+    requireName: false,
+  },
+  {
+    query: "Kräutertee",
+    means: "травяной чай",
+    not: ["чёрный чай", "набор"],
+    acceptCategories: ["tee"],
+    aliases: [],
+    reject: ["set", "schwarz"],
+    requireName: true,
+    stem: true,
+    need: ["krauter"],
+  },
+  {
+    query: "Pizza",
+    means: "пицца",
+    not: ["печь", "декор", "только тесто"],
+    acceptCategories: ["tiefkuhlpizza"],
+    aliases: [],
+    reject: ["miniatur", "deko", "gutschein", "teig"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Müsli",
+    means: "мюсли",
+    not: ["батончик", "миска", "йогурт"],
+    acceptCategories: ["muslimischungen", "musli"],
+    aliases: [],
+    reject: ["riegel", "schale", "joghurt"],
+    requireName: true,
+    stem: true,
+  },
+  {
+    query: "Cola",
+    means: "кола",
+    not: ["попкорн", "виски"],
+    acceptCategories: ["softdrinks"],
+    aliases: ["pepsi"],
+    reject: ["popcorn", "maker", "whisky", "walker"],
+    requireName: true,
+    stem: true,
   },
 ];
 
@@ -345,7 +745,11 @@ function nameOk(name: string, rule: ExactQuery): boolean {
   const found = words(name);
   if (
     found.some((word) =>
-      accepted.some((stem) => word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`),
+      accepted.some((stem) => {
+        if (word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`) return true;
+        if (!rule.stem || stem.length < 4) return false;
+        return word.startsWith(stem) || word.endsWith(stem);
+      }),
     )
   ) {
     return true;
@@ -355,6 +759,12 @@ function nameOk(name: string, rule: ExactQuery): boolean {
     const token = stem.replace(/[^a-z0-9]+/g, "");
     return token.length >= 8 && packed.includes(token);
   });
+}
+
+function needed(name: string, description: string, stems: string[] | undefined): boolean {
+  if (!stems || stems.length === 0) return true;
+  const blob = fold(`${name} ${description}`);
+  return stems.some((stem) => blob.includes(fold(stem)));
 }
 
 function rejected(name: string, category: string, description: string, stems: string[]): boolean {
@@ -381,10 +791,12 @@ export function offerFits(query: string, productName: string, description: strin
   if (!rule) return genericName(name, query);
 
   if (rejected(name, cat, description, rule.reject)) return false;
+  if (!needed(name, description, rule.need)) return false;
   const catMatches = Boolean(cat) && categoryOk(cat, rule.acceptCategories);
   const named = nameOk(name, rule);
   if (rule.requireName) {
-    if (!named) return false;
+    const described = Boolean(rule.need?.length) && needed(name, description, rule.need) && catMatches;
+    if (!named && !described) return false;
     if (!cat) return true;
     return catMatches || rule.acceptCategories.length === 0;
   }

@@ -434,8 +434,28 @@ export function AngeboteApp() {
               <span className="text-muted">{EXACT_QUERIES.length}</span>
             </summary>
             <ul className="divide-y divide-line border-t border-line">
-              {EXACT_QUERIES.map((rule) => (
-                <li key={rule.query} className="py-2">
+              {CATEGORIES.map((category) => {
+                const rules = EXACT_QUERIES.filter((rule) => categoryOf(rule.query) === category.id);
+                if (rules.length === 0) return null;
+                return (
+                  <li key={category.id} className="py-2">
+                    <p className="text-xs font-medium tracking-[0.14em] text-muted uppercase">{category.label}</p>
+                    <ul className="mt-1">
+                      {rules.map((rule) => (
+                        <li key={rule.query} className="py-1.5">
+                          <p>
+                            <span className="font-medium">{rule.query}</span>
+                            <span className="text-muted"> — {rule.means}</span>
+                          </p>
+                          <p className="text-xs text-muted">не {rule.not.join(", ")}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+              {EXACT_QUERIES.filter((rule) => categoryOf(rule.query) == null).map((rule) => (
+                <li key={rule.query} className="py-1.5">
                   <p>
                     <span className="font-medium">{rule.query}</span>
                     <span className="text-muted"> — {rule.means}</span>
