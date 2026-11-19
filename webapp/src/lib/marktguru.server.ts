@@ -226,7 +226,7 @@ export async function studyLeaflets(input: {
   const status = await rememberWeek();
   if (status.already) return { offers: status.offers, already: true };
   try {
-    const lessons = await gatherLessons(input.zip);
+    const lessons = await gatherLessons(input.zip, (offers) => rememberProducts(input.country, offers));
     await learnLessons(lessons);
   } catch (err) {
     console.error("leaflet study", err);
