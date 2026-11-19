@@ -14,7 +14,7 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { brainSnapshot, flyerHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import { brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import type { BrainView } from "@/lib/brain";
 import { useAngebote, type LastScan } from "@/lib/store";
 import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
@@ -192,6 +192,7 @@ export function AngeboteApp() {
   const scan = useServerFn(scanQuery);
   const study = useServerFn(studyLeaflets);
   const hints = useServerFn(flyerHints);
+  const catalogHints = useServerFn(productHints);
   const brainOf = useServerFn(brainSnapshot);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
@@ -235,9 +236,20 @@ export function AngeboteApp() {
     }
     let cancel = false;
     const timer = setTimeout(() => {
-      void hints({ data: { prefix } })
-        .then((rows) => {
-          if (!cancel) setFlyer(rows);
+      void Promise.all([
+        catalogHints({ data: { country, prefix } }),
+        hints({ data: { prefix } }),
+      ])
+        .then(([known, learned]) => {
+          if (!cancel) {
+            const seen = new Set<string>();
+            setFlyer([...known, ...learned].filter(row => {
+              const key = row.name.toLocaleLowerCase("de");
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }).slice(0, 12));
+          }
         })
         .catch(() => {
           if (!cancel) setFlyer([]);
@@ -247,7 +259,7 @@ export function AngeboteApp() {
       cancel = true;
       clearTimeout(timer);
     };
-  }, [draft, hints]);
+  }, [draft, country, hints, catalogHints]);
 
   const listKey = lists.map((list) => list.items.map((item) => item.name).join("|")).join(";");
   useEffect(() => {
