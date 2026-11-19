@@ -1,5 +1,6 @@
 import { EXACT_QUERIES, exactQueryFor, hardReject, offerFits } from "@/lib/exact";
 import type { Lesson } from "@/lib/brain";
+import type { ProductObservation } from "@/lib/product-knowledge.server";
 import { flyerWeekStart } from "@/lib/week";
 
 const KEYS = {
@@ -46,7 +47,8 @@ async function pool<T>(items: T[], width: number, run: (item: T) => Promise<void
 }
 
 /** Current search pages plus leaflet brochures that started before this week. */
-export async function gatherLessons(zip: string): Promise<Lesson[]> {
+export async function gatherLessons(zip: string, observe?: (offers: ProductObservation[]) => Promise<void>): Promise<Lesson[]> {
+  const discovered: ProductObservation[] = [];
   const lessons: Lesson[] = [];
   await pool(
     EXACT_QUERIES.map((rule) => rule.query),
@@ -61,6 +63,7 @@ export async function gatherLessons(zip: string): Promise<Lesson[]> {
       url.searchParams.set("zipCode", zip);
       const data = await getJson<{ results?: Raw[] }>(url.toString());
       for (const entry of data?.results ?? []) {
+        discovered.push({ name: entry.product?.name || entry.name || "", category: entry.categories?.[0]?.name ?? "" });
         const name = (entry.product?.name || entry.name || "").trim();
         if (name.length < 3) continue;
         const category = entry.categories?.[0]?.name ?? "";
@@ -106,11 +109,13 @@ export async function gatherLessons(zip: string): Promise<Lesson[]> {
     if (name.length < 3) return;
     const category = entry.categories?.[0]?.name ?? "";
     const description = entry.description || "";
+    discovered.push({ name, category });
     for (const rule of EXACT_QUERIES) {
       const fits = offerFits(rule.query, name, description, category);
       if (!fits && !hardReject(rule.query, name, description, category)) continue;
       lessons.push({ intent: rule.query, name, category, positive: fits });
     }
   });
+  if (observe && discovered.length) await observe(discovered);
   return lessons;
 }
