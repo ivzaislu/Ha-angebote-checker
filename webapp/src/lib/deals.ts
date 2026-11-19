@@ -14,6 +14,7 @@ export type Deal = {
   onlineOnly: boolean;
   category: string;
   fromBrain?: boolean;
+  fromArchive?: boolean;
 };
 
 export type ItemScan = {

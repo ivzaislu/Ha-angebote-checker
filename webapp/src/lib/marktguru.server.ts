@@ -7,6 +7,7 @@ import { rememberProducts } from "@/lib/product-knowledge.server";
 import { inferUnitPrice } from "@/lib/unit-price";
 import { archiveOffers } from "@/lib/offer-archive";
 import { getSql } from "@/lib/db";
+import { savedOffers } from "@/lib/offer-cache";
 import { compatibleSalmon } from "@/lib/product-variants";
 
 const UA = "Mozilla/5.0";
@@ -180,6 +181,15 @@ export async function searchDeals(input: {
 }): Promise<Deal[]> {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
+  const saved = await savedOffers(await getSql(), {...input,retailers});
+  const cachedDeals = saved.flatMap(entry=>{
+    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image,null);
+    return deal ? [{...deal,fromArchive:true}] : [];
+  });
+  if (cachedDeals.length) {
+    return cachedDeals.sort((a,b)=>b.relevance-a.relevance || (a.priceValue ?? 1e9)-(b.priceValue ?? 1e9));
+  }
+  // A missing local match needs only this query, never a full leaflet crawl.
   const raw = await fetchRaw(input.country, input.zip, input.query, false);
   await archiveOffers(await getSql(), input.country, input.zip, raw);
   await rememberProducts(input.country, raw.map((entry) => ({

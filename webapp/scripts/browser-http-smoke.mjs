@@ -30,24 +30,20 @@ try {
   await page.getByRole('button', {name:'Добавить', exact:true}).click();
   await page.getByRole('button', {name:'Убрать RemoveProbe', exact:true}).click();
   await page.getByRole('button', {name:'Убрать RemoveProbe', exact:true}).waitFor({state:'detached'});
-  // Saved search response is a fixture; the history request itself uses the real server/DB.
-  await page.evaluate(() => {
-    const saved = JSON.parse(localStorage.getItem('angebote-v1'));
-    const state = saved.state;
-    const active = state.lists.find(list => list.id === state.activeListId);
-    active.items = [{id:'history-fixture',name:'Milch'}];
-    state.scans[active.id] = {at:new Date().toISOString(),errors:{},byItem:{Milch:[{
-      id:'history-offer',item:'Milch',productName:'Frische Milch',description:'Bio 1 l',
-      retailer:'Compose fixture',priceLabel:'1,29 €',priceValue:1.29,
-      validFrom:'',validTo:'',imageUrl:'',relevance:100,onlineOnly:false,category:'Milch',
-    }]}};
-    localStorage.setItem('angebote-v1',JSON.stringify(saved));
-  });
+  // No saved scan fixture: search must use the real regional archive. CI forbids
+  // all live Marktguru requests inside the app container.
+  await page.locator('#item').fill('Milch');
+  await page.getByRole('button', {name:'Добавить', exact:true}).click();
+  await page.locator('#zip').fill('10115');
+  await page.getByRole('button',{name:'Найти акции',exact:true}).click();
+  await page.getByText('из сохранённых акций',{exact:true}).waitFor();
+  await page.getByText('1,79 €',{exact:true}).waitFor();
   await page.reload();
+  await page.getByText('из сохранённых акций',{exact:true}).waitFor();
   await page.getByRole('button',{name:'История цен',exact:true}).click();
   await page.getByText('От 1.29 до 1.79 € · наблюдений: 2',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);
-  console.log('HTTP browser checks passed: add/remove, new list, reload persistence, offer cards and real archived price history');
+  console.log('HTTP browser checks passed: add/remove, new list, reload persistence, cache-first search with live Marktguru blocked and real price history');
 } finally {
   await browser.close();
 }

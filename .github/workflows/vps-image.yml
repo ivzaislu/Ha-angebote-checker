@@ -9,6 +9,7 @@ on:
       - 'compose.yaml'
       - 'deploy/compose.ci.yaml'
       - 'deploy/compose-smoke.mjs'
+      - 'deploy/deny-marktguru.mjs'
       - '.github/workflows/vps-image.yml'
   workflow_dispatch:
 permissions:

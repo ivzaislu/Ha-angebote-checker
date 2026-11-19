@@ -1,5 +1,10 @@
 # Isolated PostgreSQL fixture for CI; not part of the production configuration.
 services:
+  app:
+    environment:
+      NODE_OPTIONS: --import /checks/deny-marktguru.mjs
+    volumes:
+      - ./deploy/deny-marktguru.mjs:/checks/deny-marktguru.mjs:ro
   db:
     image: postgres:16-alpine
     environment:

@@ -142,6 +142,7 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
             </span>
           ) : null}
           {deal.onlineOnly ? <span>только онлайн</span> : null}
+          {deal.fromArchive ? <span>из сохранённых акций</span> : null}
           {deal.fromBrain ? <span>узнал по листовкам</span> : null}
           {deal.relevance < 50 && !deal.fromBrain ? <span>похожее</span> : null}
         </p>
@@ -260,6 +261,7 @@ export function AngeboteApp() {
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [updatingLeaflets, setUpdatingLeaflets] = useState(false);
   const [progress, setProgress] = useState("");
   const [ready, setReady] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -335,12 +337,6 @@ export function AngeboteApp() {
 
   const zipValid = zipOk(country, zip);
 
-  // Automatically study leaflets once the user has configured a valid postcode.
-  // Server-side rememberWeek prevents repeating the same weekly study.
-  useEffect(() => {
-    if (!ready || !zipValid) return;
-    void study({ data: { country, zip } }).catch((err) => console.error("automatic leaflet study", err));
-  }, [ready, country, zip, zipValid, study]);
   const catalog = COUNTRIES[country];
 
   function onAdd(name: string) {
@@ -349,20 +345,26 @@ export function AngeboteApp() {
     if (ok) setDraft("");
   }
 
+  async function onUpdateLeaflets() {
+    if (!zipValid || country !== "de" || updatingLeaflets) return;
+    setUpdatingLeaflets(true);
+    setNote("");
+    try {
+      await study({data:{country,zip}});
+      setNote("Листовки обновлены. Нажмите «Найти акции».");
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : "Не удалось обновить листовки");
+    } finally {
+      setUpdatingLeaflets(false);
+    }
+  }
+
   async function onScan() {
     const targets = lists.filter((list) => list.items.length > 0);
     if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
     setNote("");
-    setProgress("листовки");
-    try {
-      const studied = await study({ data: { country, zip } });
-      if (!studied.already && studied.offers > 0) {
-        setNote(`Мозг разобрал ${studied.offers} акций из листовок`);
-      }
-    } catch {
-      setNote("");
-    }
+    setProgress("");
     const total = targets.reduce((sum, list) => sum + list.items.length, 0);
     let done = 0;
 
@@ -402,7 +404,6 @@ export function AngeboteApp() {
 
   const fresh = lastScan ? isCurrentFlyer(lastScan.at) : false;
   const week = flyerLabel();
-  const anyScan = lists.some((list) => scans[list.id]);
   const visibleItems = items.filter((item) => inCategories(item.name, categories));
   const hits = lastScan
     ? visibleItems.reduce((sum, item) => {
@@ -838,7 +839,7 @@ export function AngeboteApp() {
             <p className={fresh || !lastScan ? "mt-2 text-sm text-muted" : "mt-3 border border-stamp px-3 py-2 text-sm"}>
               {lastScan && !fresh
                 ? `Проспекты уже другие, сейчас ${week} Списки ниже ещё со старого ассортимента.`
-                : `Листовки этой недели: ${week} Ассортимент меняется по средам.`}
+                : "Сначала ищем в сохранённых акциях вашего индекса. Если совпадений нет — запрашиваем Marktguru."}
             </p>
           ) : null}
 
@@ -883,7 +884,15 @@ export function AngeboteApp() {
             className="inline-flex h-12 flex-1 items-center justify-center gap-2 bg-stamp px-4 text-base font-medium text-stamp-ink disabled:opacity-40 sm:flex-none sm:px-8"
           >
             {scanning ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {scanning ? `Обновляем ${progress}` : anyScan ? "Обновить списки" : "Проверить акции"}
+            {scanning ? `Ищем ${progress}` : "Найти акции"}
+          </button>
+          <button
+            type="button"
+            disabled={!zipValid || country !== "de" || updatingLeaflets}
+            onClick={() => void onUpdateLeaflets()}
+            className="h-12 shrink-0 border border-line px-3 text-sm disabled:opacity-40"
+          >
+            {updatingLeaflets ? "Обновляем листовки…" : "Обновить листовки"}
           </button>
           {scanning ? null : (
             <p className="hidden text-sm text-muted sm:block">
