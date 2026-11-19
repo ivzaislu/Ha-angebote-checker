@@ -5,6 +5,7 @@ import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesso
 import { gatherLessons } from "@/lib/corpus.server";
 import { rememberProducts } from "@/lib/product-knowledge.server";
 import { inferUnitPrice } from "@/lib/unit-price";
+import { compatibleSalmon } from "@/lib/product-variants";
 
 const UA = "Mozilla/5.0";
 
@@ -111,7 +112,7 @@ function parseOffer(
   const description = entry.description || "";
   const category = entry.categories?.[0]?.name ?? "";
   const keep = decision ? decision.keep : offerFits(query, productName, description, category);
-  if (!keep) return null;
+  if (!keep || !compatibleSalmon(query, productName)) return null;
   const relevance = relevanceScore(query, productName, description);
   const { label, value } = formatPrice(entry.price);
   const dates = entry.validityDates?.[0];
