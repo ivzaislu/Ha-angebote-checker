@@ -7,3 +7,14 @@
 Файлы здесь — исходники приложения (список, запрос, карточки акций). Они собираются как веб-приложение, а не как карточка Lovelace.
 
 Ключи Marktguru те же публичные, что уже лежат в `custom_components/angebote_checker/const.py`, и используются только на сервере.
+
+
+## Запуск
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+Приложение откроется на порту 8080. `npm run build` собирает его для Vercel. Обученные веса сети лежат в `src/lib/trained-brain.json`. Повторное обучение на актуальных листовках: `node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/train-brain.ts`.
