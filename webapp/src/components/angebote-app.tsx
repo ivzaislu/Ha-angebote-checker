@@ -13,6 +13,7 @@ import {
 import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
+import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
 import { scanQuery } from "@/lib/scan";
 import { useAngebote, type LastScan } from "@/lib/store";
 
@@ -89,13 +90,16 @@ function ItemResults({
   error,
   known,
   scanning,
+  dropped,
 }: {
   item: string;
   deals: Deal[];
   error: string | null;
   known: boolean;
   scanning: boolean;
+  dropped: number;
 }) {
+  const rule = exactQueryFor(item);
   const [open, setOpen] = useState(false);
   const { shown, rest } = primaryDeals(deals);
   const visible = open ? deals : shown;
@@ -109,9 +113,21 @@ function ItemResults({
           {error ? "ошибка" : !known ? "" : deals.length === 0 ? "нет акций" : `${deals.length}`}
         </p>
       </header>
+      {rule ? (
+        <p className="mb-2 text-xs text-muted">
+          Ищем {rule.means}. Не {rule.not.join(", ")}.
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-stamp">{error}</p> : null}
       {!error && known && deals.length === 0 ? (
-        <p className="text-sm text-muted">В текущих проспектах по этому индексу ничего не нашлось.</p>
+        <p className="text-sm text-muted">
+          {dropped > 0
+            ? "В проспектах всплыло похожее, но это другой товар. Такие строки скрыты."
+            : "В текущих проспектах по этому индексу ничего не нашлось."}
+        </p>
+      ) : null}
+      {dropped > 0 && deals.length > 0 ? (
+        <p className="mb-2 text-xs text-muted">Скрыто похожих, но других товаров: {dropped}</p>
       ) : null}
       {!known ? (
         <p className="text-sm text-muted">{scanning ? "Проверяем…" : "Ещё не проверяли"}</p>
@@ -230,8 +246,10 @@ export function AngeboteApp() {
   const visibleItems = items.filter((item) => inCategories(item.name, categories));
   const hits = lastScan
     ? visibleItems.reduce((sum, item) => {
-        const deals = (lastScan.byItem[item.name] ?? []).filter((deal) =>
-          dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
+        const deals = (lastScan.byItem[item.name] ?? []).filter(
+          (deal) =>
+            offerFits(item.name, deal.productName, deal.description, deal.category ?? "") &&
+            dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
         );
         return sum + deals.length;
       }, 0)
@@ -410,6 +428,24 @@ export function AngeboteApp() {
             </div>
           </div>
 
+          <details className="mt-4">
+            <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
+              <span>Точные запросы</span>
+              <span className="text-muted">{EXACT_QUERIES.length}</span>
+            </summary>
+            <ul className="divide-y divide-line border-t border-line">
+              {EXACT_QUERIES.map((rule) => (
+                <li key={rule.query} className="py-2">
+                  <p>
+                    <span className="font-medium">{rule.query}</span>
+                    <span className="text-muted"> — {rule.means}</span>
+                  </p>
+                  <p className="text-xs text-muted">не {rule.not.join(", ")}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
+
           <div className="mt-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm text-muted">Списки</p>
@@ -536,12 +572,19 @@ export function AngeboteApp() {
 
           <ul className="mt-4 divide-y divide-line border-t border-line">
             {items.filter((item) => inCategories(item.name, categories)).map((item) => {
+              const rule = exactQueryFor(item.name);
               const cat = categoryOf(item.name);
               return (
-                <li key={item.id} className="flex items-center justify-between gap-3 py-2">
-                  <span className="min-w-0 truncate">
-                    {item.name}
-                    {cat ? <span className="ml-2 text-xs text-muted">{categoryLabel(cat)}</span> : null}
+                <li key={item.id} className="flex items-start justify-between gap-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block truncate">{item.name}</span>
+                    {rule ? (
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {rule.means}. Не {rule.not.join(", ")}
+                      </span>
+                    ) : cat ? (
+                      <span className="mt-0.5 block text-xs text-muted">{categoryLabel(cat)}</span>
+                    ) : null}
                   </span>
                   <button
                     type="button"
@@ -581,8 +624,11 @@ export function AngeboteApp() {
 
           {visibleItems.map((item) => {
             const known = lastScan != null && Object.prototype.hasOwnProperty.call(lastScan.byItem, item.name);
-            const deals = (known ? (lastScan?.byItem[item.name] ?? []) : []).filter((deal) =>
-              dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
+            const raw = known ? (lastScan?.byItem[item.name] ?? []) : [];
+            const deals = raw.filter(
+              (deal) =>
+                offerFits(item.name, deal.productName, deal.description, deal.category ?? "") &&
+                dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
             );
             return (
               <ItemResults
@@ -592,6 +638,7 @@ export function AngeboteApp() {
                 error={known && !scanning ? (lastScan?.errors[item.name] ?? null) : null}
                 known={known}
                 scanning={scanning}
+                dropped={raw.length - deals.length}
               />
             );
           })}

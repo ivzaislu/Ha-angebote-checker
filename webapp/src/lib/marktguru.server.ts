@@ -1,5 +1,6 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
+import { offerFits } from "@/lib/exact";
 
 const UA = "Mozilla/5.0";
 
@@ -103,6 +104,8 @@ function parseOffer(
 
   const productName = entry.product?.name || entry.name || "";
   const description = entry.description || "";
+  const category = entry.categories?.[0]?.name ?? "";
+  if (!offerFits(query, productName, description, category)) return null;
   const relevance = relevanceScore(query, productName, description);
   const { label, value } = formatPrice(entry.price);
   const dates = entry.validityDates?.[0];
@@ -122,7 +125,7 @@ function parseOffer(
     imageUrl: offerId ? imageTemplate.replace("{offer_id}", String(offerId)) : "",
     relevance,
     onlineOnly: /nur online|online verfügbar/.test(blob),
-    category: entry.categories?.[0]?.name ?? "",
+    category,
   };
 }
 
