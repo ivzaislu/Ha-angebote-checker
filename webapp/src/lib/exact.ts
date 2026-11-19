@@ -783,6 +783,13 @@ function genericName(name: string, query: string): boolean {
   return words(name).some((word) => word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`);
 }
 
+/** True when a handwritten reject fired. The learner must not overrule these. */
+export function hardReject(query: string, productName: string, description: string, category: string): boolean {
+  const rule = exactQueryFor(query);
+  if (!rule) return false;
+  return rejected(productName || "", category || "", description || "", rule.reject);
+}
+
 /** True when the offer is the product that was asked for, not a lookalike. */
 export function offerFits(query: string, productName: string, description: string, category: string): boolean {
   const rule = exactQueryFor(query);

@@ -14,7 +14,8 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { scanQuery } from "@/lib/scan";
+import { brainSnapshot, flyerHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import type { BrainView } from "@/lib/brain";
 import { useAngebote, type LastScan } from "@/lib/store";
 import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
 
@@ -78,7 +79,8 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
             </span>
           ) : null}
           {deal.onlineOnly ? <span>только онлайн</span> : null}
-          {deal.relevance < 50 ? <span>похожее</span> : null}
+          {deal.fromBrain ? <span>узнал по листовкам</span> : null}
+          {deal.relevance < 50 && !deal.fromBrain ? <span>похожее</span> : null}
         </p>
       </div>
     </article>
@@ -188,6 +190,9 @@ export function AngeboteApp() {
   const lastScan = active ? (scans[active.id] ?? null) : null;
 
   const scan = useServerFn(scanQuery);
+  const study = useServerFn(studyLeaflets);
+  const hints = useServerFn(flyerHints);
+  const brainOf = useServerFn(brainSnapshot);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -198,8 +203,20 @@ export function AngeboteApp() {
   const [makingList, setMakingList] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const [listNote, setListNote] = useState("");
+  const [flyer, setFlyer] = useState<{ name: string; seen: number }[]>([]);
+  const [brain, setBrain] = useState<BrainView | null>(null);
 
-  const matches = suggestProducts(draft, categories);
+  const dict = suggestProducts(draft, categories);
+  const matches = [
+    ...dict.map((name) => ({ name, fromFlyer: false, seen: 0 })),
+    ...flyer
+        .filter((hint) => {
+        const needle = draft.trim().toLowerCase();
+        const name = hint.name.toLowerCase();
+        return !dict.some((entry) => entry.toLowerCase() === hint.name.toLowerCase()) && (name.startsWith(needle) || name.includes(needle));
+      })
+      .map((hint) => ({ name: hint.name, fromFlyer: true, seen: hint.seen })),
+  ].slice(0, 8);
   const showSuggest = focused && matches.length > 0;
 
   useEffect(() => {
@@ -209,6 +226,37 @@ export function AngeboteApp() {
   useEffect(() => {
     setHighlight(0);
   }, [draft]);
+
+  useEffect(() => {
+    const prefix = draft.trim();
+    if (prefix.length < 2) {
+      setFlyer([]);
+      return;
+    }
+    let cancel = false;
+    const timer = setTimeout(() => {
+      void hints({ data: { prefix } })
+        .then((rows) => {
+          if (!cancel) setFlyer(rows);
+        })
+        .catch(() => {
+          if (!cancel) setFlyer([]);
+        });
+    }, 200);
+    return () => {
+      cancel = true;
+      clearTimeout(timer);
+    };
+  }, [draft, hints]);
+
+  const listKey = lists.map((list) => list.items.map((item) => item.name).join("|")).join(";");
+  useEffect(() => {
+    if (!ready) return;
+    const queries = lists.flatMap((list) => list.items.map((item) => item.name));
+    void brainOf({ data: { queries } })
+      .then(setBrain)
+      .catch(() => undefined);
+  }, [ready, listKey]);
 
   const zipValid = zipOk(country, zip);
   const catalog = COUNTRIES[country];
@@ -224,6 +272,15 @@ export function AngeboteApp() {
     if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
     setNote("");
+    setProgress("листовки");
+    try {
+      const studied = await study({ data: { country, zip } });
+      if (!studied.already && studied.offers > 0) {
+        setNote(`Мозг разобрал ${studied.offers} акций из листовок`);
+      }
+    } catch {
+      setNote("");
+    }
     const total = targets.reduce((sum, list) => sum + list.items.length, 0);
     let done = 0;
 
@@ -255,6 +312,10 @@ export function AngeboteApp() {
 
     setScanning(false);
     setProgress("");
+    const queries = lists.flatMap((list) => list.items.map((item) => item.name));
+    void brainOf({ data: { queries } })
+      .then(setBrain)
+      .catch(() => undefined);
   }
 
   const fresh = lastScan ? isCurrentFlyer(lastScan.at) : false;
@@ -331,7 +392,7 @@ export function AngeboteApp() {
             onSubmit={(event) => {
               event.preventDefault();
               const picked = showSuggest ? matches[highlight] : undefined;
-              onAdd(picked ?? draft);
+              onAdd(picked?.name ?? draft);
               setFocused(false);
             }}
           >
@@ -382,11 +443,12 @@ export function AngeboteApp() {
                 role="listbox"
                 className="absolute z-20 mt-1 right-14 left-0 max-h-64 overflow-auto border border-line bg-card shadow-sm"
               >
-                {matches.map((name, index) => {
+                {matches.map((hint, index) => {
+                  const name = hint.name;
                   const typed = draft.trim();
                   const head = name.toLowerCase().startsWith(typed.toLowerCase()) ? typed.length : 0;
                   return (
-                    <li key={name} role="option" aria-selected={index === highlight}>
+                    <li key={`${hint.fromFlyer ? "flyer" : "dict"}-${name}`} role="option" aria-selected={index === highlight}>
                       <button
                         type="button"
                         className={
@@ -403,6 +465,11 @@ export function AngeboteApp() {
                       >
                         <span className="font-medium">{name.slice(0, head)}</span>
                         <span className="text-muted">{name.slice(head)}</span>
+                        {hint.fromFlyer ? (
+                          <span className="ml-auto pl-3 text-xs text-muted">
+                            из листовок{hint.seen > 1 ? ` · ${hint.seen}` : ""}
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   );
@@ -482,6 +549,35 @@ export function AngeboteApp() {
                 </li>
               ))}
             </ul>
+          </details>
+
+          <details className="mt-4">
+            <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
+              <span>Мозг акций</span>
+              <span className="text-muted">{brain && brain.offers > 0 ? brain.offers : "учится"}</span>
+            </summary>
+            <p className="text-sm text-muted">
+              Читает названия из листовок и запоминает, как магазины называют товар. В новую среду старые примеры слабеют, свежий ассортимент перевешивает.
+            </p>
+            {brain && brain.intents.length > 0 ? (
+              <ul className="mt-2 divide-y divide-line">
+                {brain.intents.map((intent) => (
+                  <li key={intent.intent} className="py-2 text-sm">
+                    <p className="font-medium">{intent.intent}</p>
+                    {intent.names.length > 0 ? (
+                      <p className="text-muted">в листовках: {intent.names.join(", ")}</p>
+                    ) : null}
+                    {intent.rejected.length > 0 ? (
+                      <p className="text-muted">не это: {intent.rejected.join(", ")}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted">
+                Пока пусто. «Обновить списки» один раз за неделю читает листовки и дальше доучивается на ваших товарах.
+              </p>
+            )}
           </details>
 
           <div className="mt-4">

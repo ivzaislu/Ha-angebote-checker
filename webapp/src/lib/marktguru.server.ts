@@ -1,6 +1,7 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
 import { offerFits } from "@/lib/exact";
+import { observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
 
 const UA = "Mozilla/5.0";
 
@@ -92,6 +93,7 @@ function parseOffer(
   query: string,
   retailers: string[],
   imageTemplate: string,
+  decision: { keep: boolean; fromBrain: boolean } | null,
 ): Deal | null {
   const advertiser = entry.advertisers?.[0];
   const retailer = advertiser?.name || entry.retailerName || "Неизвестно";
@@ -105,7 +107,8 @@ function parseOffer(
   const productName = entry.product?.name || entry.name || "";
   const description = entry.description || "";
   const category = entry.categories?.[0]?.name ?? "";
-  if (!offerFits(query, productName, description, category)) return null;
+  const keep = decision ? decision.keep : offerFits(query, productName, description, category);
+  if (!keep) return null;
   const relevance = relevanceScore(query, productName, description);
   const { label, value } = formatPrice(entry.price);
   const dates = entry.validityDates?.[0];
@@ -126,6 +129,7 @@ function parseOffer(
     relevance,
     onlineOnly: /nur online|online verfügbar/.test(blob),
     category,
+    fromBrain: decision?.fromBrain ?? false,
   };
 }
 
@@ -170,11 +174,28 @@ export async function searchDeals(input: {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
   const raw = await fetchRaw(input.country, input.zip, input.query, false);
+  const lessons: OfferLesson[] = raw.map((entry) => ({
+    name: entry.product?.name || entry.name || "",
+    description: entry.description || "",
+    category: entry.categories?.[0]?.name ?? "",
+  }));
+  let decisions: Array<{ keep: boolean; fromBrain: boolean }> | null = null;
+  try {
+    decisions = await observeOffers(input.query, lessons);
+  } catch (err) {
+    console.error("offer brain", err);
+  }
   const seen = new Set<string>();
   const deals: Deal[] = [];
 
-  for (const entry of raw) {
-    const deal = parseOffer(entry, input.query, retailers, CONFIG[input.country].image);
+  for (let index = 0; index < raw.length; index += 1) {
+    const deal = parseOffer(
+      raw[index],
+      input.query,
+      retailers,
+      CONFIG[input.country].image,
+      decisions?.[index] ?? null,
+    );
     if (!deal) continue;
     const key = `${deal.retailer}|${deal.priceLabel}|${deal.description}|${deal.productName}`;
     if (seen.has(key)) continue;
@@ -186,4 +207,54 @@ export async function searchDeals(input: {
     (a, b) => b.relevance - a.relevance || (a.priceValue ?? 1e9) - (b.priceValue ?? 1e9),
   );
   return deals;
+}
+
+const PROBES = [
+  "Milch",
+  "Käse",
+  "Butter",
+  "Joghurt",
+  "Brot",
+  "Eier",
+  "Fleisch",
+  "Fisch",
+  "Apfel",
+  "Gurke",
+  "Kaffee",
+  "Wasser",
+  "Nudeln",
+  "Reis",
+  "Bier",
+  "Toilettenpapier",
+];
+
+/** Read this week's leaflets once, so the learner sees more than the shopping list. */
+export async function studyLeaflets(input: {
+  country: CountryCode;
+  zip: string;
+}): Promise<{ offers: number; already: boolean }> {
+  const status = await rememberWeek();
+  if (status.already) return { offers: status.offers, already: true };
+
+  const queue = [...PROBES];
+  const workers = Array.from({ length: 4 }, async () => {
+    while (queue.length > 0) {
+      const query = queue.shift();
+      if (!query) return;
+      try {
+        const raw = await fetchRaw(input.country, input.zip, query, false);
+        const offers: OfferLesson[] = raw.map((entry) => ({
+          name: entry.product?.name || entry.name || "",
+          description: entry.description || "",
+          category: entry.categories?.[0]?.name ?? "",
+        }));
+        await observeOffers(query, offers);
+      } catch (err) {
+        console.error("leaflet study", query, err);
+      }
+    }
+  });
+  await Promise.all(workers);
+  const view = await snapshotFor([]);
+  return { offers: view.offers, already: false };
 }

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { BrainView, FlyerHint } from "@/lib/brain";
 import type { Deal } from "@/lib/deals";
 
 const schema = z.object({
@@ -9,22 +10,21 @@ const schema = z.object({
   retailers: z.array(z.string()),
 });
 
+function place(country: "de" | "at", zip: string): { country: "de" | "at"; zip: string } {
+  const clean = zip.trim();
+  if (country === "de" && !/^\d{5}$/.test(clean)) throw new Error("Для Германии нужен индекс из 5 цифр");
+  if (country === "at" && !/^\d{4}$/.test(clean)) throw new Error("Для Австрии нужен индекс из 4 цифр");
+  return { country, zip: clean };
+}
+
 export const scanQuery = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const parsed = schema.safeParse(data);
     if (!parsed.success) throw new Error("Некорректный запрос");
     const query = parsed.data.query.trim().replace(/\s+/g, " ");
-    const zip = parsed.data.zip.trim();
     if (!query || query.length > 80) throw new Error("Введите название товара");
-    if (parsed.data.country === "de" && !/^\d{5}$/.test(zip)) {
-      throw new Error("Для Германии нужен индекс из 5 цифр");
-    }
-    if (parsed.data.country === "at" && !/^\d{4}$/.test(zip)) {
-      throw new Error("Для Австрии нужен индекс из 4 цифр");
-    }
     return {
-      country: parsed.data.country,
-      zip,
+      ...place(parsed.data.country, parsed.data.zip),
       query,
       retailers: parsed.data.retailers.slice(0, 40),
     };
@@ -32,4 +32,37 @@ export const scanQuery = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Deal[]> => {
     const { searchDeals } = await import("@/lib/marktguru.server");
     return searchDeals(data);
+  });
+
+export const studyLeaflets = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const parsed = z.object({ country: z.enum(["de", "at"]), zip: z.string() }).safeParse(data);
+    if (!parsed.success) throw new Error("Некорректный запрос");
+    return place(parsed.data.country, parsed.data.zip);
+  })
+  .handler(async ({ data }): Promise<{ offers: number; already: boolean }> => {
+    const { studyLeaflets: study } = await import("@/lib/marktguru.server");
+    return study(data);
+  });
+
+export const flyerHints = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const parsed = z.object({ prefix: z.string() }).safeParse(data);
+    if (!parsed.success) throw new Error("Некорректный запрос");
+    return parsed.data.prefix.trim().slice(0, 40);
+  })
+  .handler(async ({ data }): Promise<FlyerHint[]> => {
+    const { hintsFor } = await import("@/lib/brain.server");
+    return hintsFor(data);
+  });
+
+export const brainSnapshot = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const parsed = z.object({ queries: z.array(z.string()) }).safeParse(data);
+    if (!parsed.success) throw new Error("Некорректный запрос");
+    return parsed.data.queries.map((query) => query.trim()).filter(Boolean).slice(0, 40);
+  })
+  .handler(async ({ data }): Promise<BrainView> => {
+    const { snapshotFor } = await import("@/lib/brain.server");
+    return snapshotFor(data);
   });

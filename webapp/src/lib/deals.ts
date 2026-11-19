@@ -12,6 +12,7 @@ export type Deal = {
   relevance: number;
   onlineOnly: boolean;
   category: string;
+  fromBrain?: boolean;
 };
 
 export type ItemScan = {
