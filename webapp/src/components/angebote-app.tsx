@@ -16,6 +16,7 @@ import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, pr
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
 import { scanQuery } from "@/lib/scan";
 import { useAngebote, type LastScan } from "@/lib/store";
+import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
@@ -91,6 +92,8 @@ function ItemResults({
   known,
   scanning,
   dropped,
+  assortment,
+  fresh,
 }: {
   item: string;
   deals: Deal[];
@@ -98,6 +101,8 @@ function ItemResults({
   known: boolean;
   scanning: boolean;
   dropped: number;
+  assortment: string[];
+  fresh: boolean;
 }) {
   const rule = exactQueryFor(item);
   const [open, setOpen] = useState(false);
@@ -118,12 +123,19 @@ function ItemResults({
           Ищем {rule.means}. Не {rule.not.join(", ")}.
         </p>
       ) : null}
+      {assortment.length > 0 ? (
+        <p className="mb-2 text-sm text-ink">
+          {fresh ? "На этой неделе" : "На прошлой неделе"}: {assortment.join(", ")}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-stamp">{error}</p> : null}
       {!error && known && deals.length === 0 ? (
         <p className="text-sm text-muted">
-          {dropped > 0
-            ? "В проспектах всплыло похожее, но это другой товар. Такие строки скрыты."
-            : "В текущих проспектах по этому индексу ничего не нашлось."}
+          {!fresh
+            ? "На эту неделю список ещё не обновляли."
+            : dropped > 0
+              ? "В проспектах всплыло похожее, но это другой товар. Такие строки скрыты."
+              : "В текущих проспектах по этому индексу ничего не нашлось."}
         </p>
       ) : null}
       {dropped > 0 && deals.length > 0 ? (
@@ -169,7 +181,7 @@ export function AngeboteApp() {
   const clearRetailers = useAngebote((s) => s.clearRetailers);
   const toggleCategory = useAngebote((s) => s.toggleCategory);
   const clearCategories = useAngebote((s) => s.clearCategories);
-  const setLastScan = useAngebote((s) => s.setLastScan);
+  const setListScan = useAngebote((s) => s.setListScan);
 
   const active = lists.find((list) => list.id === activeListId) ?? lists[0];
   const items = active?.items ?? [];
@@ -208,48 +220,54 @@ export function AngeboteApp() {
   }
 
   async function onScan() {
-    if (!zipValid || items.length === 0 || scanning) return;
-    const snapshot = items.slice();
+    const targets = lists.filter((list) => list.items.length > 0);
+    if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
     setNote("");
-    const byItem: Record<string, Deal[]> = {};
-    const errors: Record<string, string> = {};
+    const total = targets.reduce((sum, list) => sum + list.items.length, 0);
     let done = 0;
 
-    await Promise.all(
-      snapshot.map(async (item) => {
-        try {
-          byItem[item.name] = await scan({
-            data: {
-              country,
-              zip,
-              query: item.name,
-              retailers,
-            },
-          });
-        } catch (err) {
-          byItem[item.name] = [];
-          errors[item.name] = err instanceof Error ? err.message : "Не удалось проверить";
-        } finally {
-          done += 1;
-          setProgress(`${done} / ${snapshot.length}`);
-        }
-      }),
-    );
+    for (const list of targets) {
+      const byItem: Record<string, Deal[]> = {};
+      const errors: Record<string, string> = {};
+      await Promise.all(
+        list.items.map(async (item) => {
+          try {
+            byItem[item.name] = await scan({
+              data: {
+                country,
+                zip,
+                query: item.name,
+                retailers,
+              },
+            });
+          } catch (err) {
+            byItem[item.name] = [];
+            errors[item.name] = err instanceof Error ? err.message : "Не удалось проверить";
+          } finally {
+            done += 1;
+            setProgress(`${done} / ${total}`);
+          }
+        }),
+      );
+      setListScan(list.id, { at: new Date().toISOString(), byItem, errors });
+    }
 
-    const next: LastScan = { at: new Date().toISOString(), byItem, errors };
-    setLastScan(next);
     setScanning(false);
     setProgress("");
   }
 
+  const fresh = lastScan ? isCurrentFlyer(lastScan.at) : false;
+  const week = flyerLabel();
+  const anyScan = lists.some((list) => scans[list.id]);
   const visibleItems = items.filter((item) => inCategories(item.name, categories));
   const hits = lastScan
     ? visibleItems.reduce((sum, item) => {
         const deals = (lastScan.byItem[item.name] ?? []).filter(
           (deal) =>
             offerFits(item.name, deal.productName, deal.description, deal.category ?? "") &&
-            dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
+            dealInCategory(item.name, deal.category ?? "", deal.productName, categories) &&
+            dealStillOn(deal),
         );
         return sum + deals.length;
       }, 0)
@@ -630,11 +648,18 @@ export function AngeboteApp() {
 
         <section className="min-w-0">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-display text-3xl">Сейчас в акциях</h2>
+            <h2 className="font-display text-3xl">{fresh || !lastScan ? "Сейчас в акциях" : "Прошлая неделя"}</h2>
             <p className="text-sm text-muted">
               {lastScan ? `${hits} · ${formatWhen(lastScan.at)}` : ready ? "ещё не проверяли" : ""}
             </p>
           </div>
+          {ready ? (
+            <p className={fresh || !lastScan ? "mt-2 text-sm text-muted" : "mt-3 border border-stamp px-3 py-2 text-sm"}>
+              {lastScan && !fresh
+                ? `Проспекты уже другие, сейчас ${week} Списки ниже ещё со старого ассортимента.`
+                : `Листовки этой недели: ${week} Ассортимент меняется по средам.`}
+            </p>
+          ) : null}
 
           {!lastScan && !scanning && items.length === 0 ? (
             <p className="mt-6 max-w-md text-sm text-muted">
@@ -645,11 +670,12 @@ export function AngeboteApp() {
           {visibleItems.map((item) => {
             const known = lastScan != null && Object.prototype.hasOwnProperty.call(lastScan.byItem, item.name);
             const raw = known ? (lastScan?.byItem[item.name] ?? []) : [];
-            const deals = raw.filter(
+            const fitting = raw.filter(
               (deal) =>
                 offerFits(item.name, deal.productName, deal.description, deal.category ?? "") &&
                 dealInCategory(item.name, deal.category ?? "", deal.productName, categories),
             );
+            const deals = fitting.filter((deal) => dealStillOn(deal));
             return (
               <ItemResults
                 key={item.id}
@@ -658,7 +684,9 @@ export function AngeboteApp() {
                 error={known && !scanning ? (lastScan?.errors[item.name] ?? null) : null}
                 known={known}
                 scanning={scanning}
-                dropped={raw.length - deals.length}
+                dropped={raw.length - fitting.length}
+                assortment={assortmentNames(deals)}
+                fresh={fresh}
               />
             );
           })}
@@ -669,22 +697,22 @@ export function AngeboteApp() {
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <button
             type="button"
-            disabled={!zipValid || items.length === 0 || scanning}
+            disabled={!zipValid || lists.every((list) => list.items.length === 0) || scanning}
             onClick={() => void onScan()}
             className="inline-flex h-12 flex-1 items-center justify-center gap-2 bg-stamp px-4 text-base font-medium text-stamp-ink disabled:opacity-40 sm:flex-none sm:px-8"
           >
             {scanning ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {scanning ? `Проверяем ${progress}` : "Проверить акции"}
+            {scanning ? `Обновляем ${progress}` : anyScan ? "Обновить списки" : "Проверить акции"}
           </button>
           {scanning ? null : (
             <p className="hidden text-sm text-muted sm:block">
-              {items.length === 0
+              {lists.every((list) => list.items.length === 0)
                 ? "Сначала добавьте товар"
                 : !zipValid
                   ? "Нужен почтовый индекс"
-                  : retailers.length === 0
-                    ? "Все магазины"
-                    : retailers.join(", ")}
+                  : ready
+                    ? `Все списки · ${week}`
+                    : "Все списки"}
             </p>
           )}
           {note && items.length > 0 ? (

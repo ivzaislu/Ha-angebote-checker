@@ -50,6 +50,7 @@ type State = {
   toggleCategory: (id: string) => void;
   clearCategories: () => void;
   setLastScan: (scan: LastScan) => void;
+  setListScan: (listId: string, scan: LastScan) => void;
 };
 
 function activeOf(state: Pick<State, "lists" | "activeListId">): ShopList | undefined {
@@ -148,7 +149,11 @@ export const useAngebote = create<State>()(
       setLastScan: (scan) => {
         const id = activeOf(get())?.id;
         if (!id) return;
-        set({ scans: { ...get().scans, [id]: scan } });
+        get().setListScan(id, scan);
+      },
+      setListScan: (listId, scan) => {
+        if (!get().lists.some((list) => list.id === listId)) return;
+        set({ scans: { ...get().scans, [listId]: scan } });
       },
     }),
     {
