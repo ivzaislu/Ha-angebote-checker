@@ -5,18 +5,41 @@ import type { Deal } from "@/lib/deals";
 
 export type WatchItem = { id: string; name: string };
 
+export type ShopList = { id: string; name: string; items: WatchItem[] };
+
 export type LastScan = {
   at: string;
   byItem: Record<string, Deal[]>;
   errors: Record<string, string>;
 };
 
+const DEFAULT_LIST_ID = "list-einkauf";
+
+function blankList(): ShopList {
+  return { id: DEFAULT_LIST_ID, name: "Покупки", items: [] };
+}
+
+type PersistedV1 = {
+  items?: WatchItem[];
+  lists?: ShopList[];
+  activeListId?: string;
+  scans?: Record<string, LastScan>;
+  lastScan?: LastScan | null;
+  country?: CountryCode;
+  zip?: string;
+  retailers?: string[];
+};
+
 type State = {
-  items: WatchItem[];
+  lists: ShopList[];
+  activeListId: string;
   country: CountryCode;
   zip: string;
   retailers: string[];
-  lastScan: LastScan | null;
+  scans: Record<string, LastScan>;
+  createList: (name: string) => boolean;
+  deleteList: (id: string) => void;
+  setActiveList: (id: string) => void;
   addItem: (name: string) => boolean;
   removeItem: (id: string) => void;
   setCountry: (country: CountryCode) => void;
@@ -26,37 +49,79 @@ type State = {
   setLastScan: (scan: LastScan) => void;
 };
 
+function activeOf(state: Pick<State, "lists" | "activeListId">): ShopList | undefined {
+  return state.lists.find((list) => list.id === state.activeListId) ?? state.lists[0];
+}
+
 export const useAngebote = create<State>()(
   persist(
     (set, get) => ({
-      items: [],
+      lists: [blankList()],
+      activeListId: DEFAULT_LIST_ID,
       country: "de",
       zip: "",
       retailers: [],
-      lastScan: null,
+      scans: {},
+      createList: (name) => {
+        const trimmed = name.trim().replace(/\s+/g, " ");
+        if (!trimmed) return false;
+        if (get().lists.some((list) => list.name.toLowerCase() === trimmed.toLowerCase())) return false;
+        const id = crypto.randomUUID();
+        set({
+          lists: [...get().lists, { id, name: trimmed, items: [] }],
+          activeListId: id,
+        });
+        return true;
+      },
+      deleteList: (id) => {
+        const lists = get().lists;
+        if (lists.length <= 1) return;
+        const next = lists.filter((list) => list.id !== id);
+        const scans = { ...get().scans };
+        delete scans[id];
+        set({
+          lists: next,
+          activeListId: get().activeListId === id ? next[0].id : get().activeListId,
+          scans,
+        });
+      },
+      setActiveList: (id) => {
+        if (get().lists.some((list) => list.id === id)) set({ activeListId: id });
+      },
       addItem: (name) => {
         const trimmed = name.trim().replace(/\s+/g, " ");
         if (!trimmed) return false;
-        if (get().items.some((item) => item.name.toLowerCase() === trimmed.toLowerCase())) {
-          return false;
-        }
+        const current = activeOf(get());
+        if (!current) return false;
+        if (current.items.some((item) => item.name.toLowerCase() === trimmed.toLowerCase())) return false;
         set({
-          items: [...get().items, { id: crypto.randomUUID(), name: trimmed }],
+          lists: get().lists.map((list) =>
+            list.id === current.id
+              ? { ...list, items: [...list.items, { id: crypto.randomUUID(), name: trimmed }] }
+              : list,
+          ),
         });
         return true;
       },
       removeItem: (id) => {
-        const name = get().items.find((item) => item.id === id)?.name;
-        const last = get().lastScan;
-        let lastScan = last;
-        if (last && name) {
-          const byItem = { ...last.byItem };
-          const errors = { ...last.errors };
+        const current = activeOf(get());
+        if (!current) return;
+        const name = current.items.find((item) => item.id === id)?.name;
+        const scan = get().scans[current.id];
+        const scans = { ...get().scans };
+        if (scan && name) {
+          const byItem = { ...scan.byItem };
+          const errors = { ...scan.errors };
           delete byItem[name];
           delete errors[name];
-          lastScan = { ...last, byItem, errors };
+          scans[current.id] = { ...scan, byItem, errors };
         }
-        set({ items: get().items.filter((item) => item.id !== id), lastScan });
+        set({
+          lists: get().lists.map((list) =>
+            list.id === current.id ? { ...list, items: list.items.filter((item) => item.id !== id) } : list,
+          ),
+          scans,
+        });
       },
       setCountry: (country) => set({ country, retailers: [] }),
       setZip: (zip) => set({ zip }),
@@ -69,17 +134,36 @@ export const useAngebote = create<State>()(
         });
       },
       clearRetailers: () => set({ retailers: [] }),
-      setLastScan: (lastScan) => set({ lastScan }),
+      setLastScan: (scan) => {
+        const id = activeOf(get())?.id;
+        if (!id) return;
+        set({ scans: { ...get().scans, [id]: scan } });
+      },
     }),
     {
       name: "angebote-v1",
+      version: 2,
       skipHydration: true,
+      migrate: (persisted) => {
+        const state = (persisted ?? {}) as PersistedV1;
+        if (state.lists && state.lists.length > 0 && state.activeListId) return state as State;
+        const id = crypto.randomUUID();
+        const scans: Record<string, LastScan> = { ...(state.scans ?? {}) };
+        if (state.lastScan) scans[id] = state.lastScan;
+        return {
+          ...state,
+          lists: [{ id, name: "Покупки", items: state.items ?? [] }],
+          activeListId: id,
+          scans,
+        } as State;
+      },
       partialize: (state) => ({
-        items: state.items,
+        lists: state.lists,
+        activeListId: state.activeListId,
         country: state.country,
         zip: state.zip,
         retailers: state.retailers,
-        lastScan: state.lastScan,
+        scans: state.scans,
       }),
     },
   ),

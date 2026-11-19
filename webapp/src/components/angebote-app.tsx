@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
+import { suggestProducts } from "@/lib/products";
 import { scanQuery } from "@/lib/scan";
 import { useAngebote, type LastScan } from "@/lib/store";
 
@@ -105,7 +106,7 @@ function ItemResults({
       <header className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="font-display text-2xl text-ink">{item}</h3>
         <p className="shrink-0 text-sm text-muted">
-          {error ? "ошибка" : deals.length === 0 ? "нет акций" : `${deals.length}`}
+          {error ? "ошибка" : !known ? "" : deals.length === 0 ? "нет акций" : `${deals.length}`}
         </p>
       </header>
       {error ? <p className="text-sm text-stamp">{error}</p> : null}
@@ -134,11 +135,15 @@ function ItemResults({
 }
 
 export function AngeboteApp() {
-  const items = useAngebote((s) => s.items);
+  const lists = useAngebote((s) => s.lists);
+  const activeListId = useAngebote((s) => s.activeListId);
   const country = useAngebote((s) => s.country);
   const zip = useAngebote((s) => s.zip);
   const retailers = useAngebote((s) => s.retailers);
-  const lastScan = useAngebote((s) => s.lastScan);
+  const scans = useAngebote((s) => s.scans);
+  const createList = useAngebote((s) => s.createList);
+  const deleteList = useAngebote((s) => s.deleteList);
+  const setActiveList = useAngebote((s) => s.setActiveList);
   const addItem = useAngebote((s) => s.addItem);
   const removeItem = useAngebote((s) => s.removeItem);
   const setCountry = useAngebote((s) => s.setCountry);
@@ -147,16 +152,32 @@ export function AngeboteApp() {
   const clearRetailers = useAngebote((s) => s.clearRetailers);
   const setLastScan = useAngebote((s) => s.setLastScan);
 
+  const active = lists.find((list) => list.id === activeListId) ?? lists[0];
+  const items = active?.items ?? [];
+  const lastScan = active ? (scans[active.id] ?? null) : null;
+
   const scan = useServerFn(scanQuery);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState("");
   const [ready, setReady] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const [makingList, setMakingList] = useState(false);
+  const [listDraft, setListDraft] = useState("");
+  const [listNote, setListNote] = useState("");
+
+  const matches = suggestProducts(draft);
+  const showSuggest = focused && matches.length > 0;
 
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [draft]);
 
   const zipValid = zipOk(country, zip);
   const catalog = COUNTRIES[country];
@@ -261,10 +282,12 @@ export function AngeboteApp() {
           ) : null}
 
           <form
-            className="mt-4"
+            className="relative mt-4"
             onSubmit={(event) => {
               event.preventDefault();
-              onAdd(draft);
+              const picked = showSuggest ? matches[highlight] : undefined;
+              onAdd(picked ?? draft);
+              setFocused(false);
             }}
           >
             <label className="text-sm text-muted" htmlFor="item">
@@ -273,11 +296,30 @@ export function AngeboteApp() {
             <div className="mt-1 flex gap-2">
               <input
                 id="item"
+                role="combobox"
+                aria-expanded={showSuggest}
+                aria-controls="product-suggest"
+                aria-autocomplete="list"
                 value={draft}
-                placeholder="Toilettenpapier"
+                placeholder="gur → Gurke"
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
                 onChange={(event) => {
                   setDraft(event.target.value);
                   setNote("");
+                  setFocused(true);
+                }}
+                onKeyDown={(event) => {
+                  if (!showSuggest) return;
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setHighlight((index) => Math.min(index + 1, matches.length - 1));
+                  } else if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setHighlight((index) => Math.max(index - 1, 0));
+                  } else if (event.key === "Escape") {
+                    setFocused(false);
+                  }
                 }}
                 className="h-11 min-w-0 flex-1 border border-line bg-paper px-3 text-base outline-none"
               />
@@ -289,8 +331,115 @@ export function AngeboteApp() {
                 <Plus className="size-5" />
               </button>
             </div>
+            {showSuggest ? (
+              <ul
+                id="product-suggest"
+                role="listbox"
+                className="absolute z-20 mt-1 right-14 left-0 max-h-64 overflow-auto border border-line bg-card shadow-sm"
+              >
+                {matches.map((name, index) => {
+                  const typed = draft.trim();
+                  const head = name.toLowerCase().startsWith(typed.toLowerCase()) ? typed.length : 0;
+                  return (
+                    <li key={name} role="option" aria-selected={index === highlight}>
+                      <button
+                        type="button"
+                        className={
+                          index === highlight
+                            ? "flex h-11 w-full items-center px-3 text-left text-sm bg-paper"
+                            : "flex h-11 w-full items-center px-3 text-left text-sm"
+                        }
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setHighlight(index)}
+                        onClick={() => {
+                          onAdd(name);
+                          setFocused(false);
+                        }}
+                      >
+                        <span className="font-medium">{name.slice(0, head)}</span>
+                        <span className="text-muted">{name.slice(head)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
             {note ? <p className="mt-1 text-sm text-stamp">{note}</p> : null}
           </form>
+
+          <div className="mt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-muted">Списки</p>
+              {lists.length > 1 && active ? (
+                <button
+                  type="button"
+                  className="h-11 px-2 text-sm text-muted"
+                  onClick={() => deleteList(active.id)}
+                >
+                  Удалить
+                </button>
+              ) : null}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {lists.map((list) => {
+                const on = list.id === active?.id;
+                return (
+                  <button
+                    key={list.id}
+                    type="button"
+                    className={
+                      on
+                        ? "h-11 shrink-0 bg-ink px-3 text-sm text-paper"
+                        : "h-11 shrink-0 border border-line px-3 text-sm"
+                    }
+                    onClick={() => setActiveList(list.id)}
+                  >
+                    {list.name}
+                    <span className={on ? "text-paper/70" : "text-muted"}> {list.items.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {makingList ? (
+              <form
+                className="mt-2 flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const trimmed = listDraft.trim();
+                  if (!trimmed) return;
+                  const ok = createList(trimmed);
+                  setListNote(ok ? "" : "Такой список уже есть");
+                  if (ok) {
+                    setListDraft("");
+                    setMakingList(false);
+                  }
+                }}
+              >
+                <input
+                  value={listDraft}
+                  autoFocus
+                  placeholder="Например, Неделя"
+                  onChange={(event) => setListDraft(event.target.value)}
+                  className="h-11 min-w-0 flex-1 border border-line bg-paper px-3 text-base outline-none"
+                />
+                <button type="submit" className="h-11 shrink-0 bg-ink px-3 text-sm text-paper">
+                  Создать
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="mt-2 h-11 text-sm font-medium underline decoration-line underline-offset-4"
+                onClick={() => {
+                  setListNote("");
+                  setMakingList(true);
+                }}
+              >
+                Новый список
+              </button>
+            )}
+            {listNote ? <p className="mt-1 text-sm text-stamp">{listNote}</p> : null}
+          </div>
 
           {items.length === 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
