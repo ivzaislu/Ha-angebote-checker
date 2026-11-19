@@ -11,7 +11,7 @@ if [[ "${EUID}" -ne 0 ]]; then echo "Run as root: sudo bash deploy/update.sh" >&
 grep -Eq '^DATABASE_URL=.+$' "/etc/${SERVICE_NAME}.env" || { echo "DATABASE_URL required" >&2; exit 1; }
 command -v runuser >/dev/null
 cd "$APP_DIR"
-if [[ -n "$(git status --porcelain)" ]]; then echo "Refusing to overwrite local changes" >&2; exit 1; fi
+if [[ -n "$(runuser -u "$APP_USER" -- git status --porcelain)" ]]; then echo "Refusing to overwrite local changes" >&2; exit 1; fi
 runuser -u "$APP_USER" -- git fetch origin "$BRANCH"
 runuser -u "$APP_USER" -- git checkout "$BRANCH"
 runuser -u "$APP_USER" -- git merge --ff-only "origin/$BRANCH"
@@ -27,4 +27,4 @@ set +a
 runuser -u "$APP_USER" -- env DATABASE_URL="$DATABASE_URL" npm run build
 systemctl restart "$SERVICE_NAME"
 systemctl is-active --quiet "$SERVICE_NAME" || { echo "Service failed. Check journalctl -u $SERVICE_NAME" >&2; exit 1; }
-echo "Updated to $(git -C "$APP_DIR" rev-parse --short HEAD)"
+echo "Updated to $(runuser -u "$APP_USER" -- git -C "$APP_DIR" rev-parse --short HEAD)"
