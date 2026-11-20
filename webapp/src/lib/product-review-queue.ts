@@ -6,6 +6,10 @@ import { productProbability, PRODUCT_ACCEPT_SCORE, PRODUCT_REJECT_SCORE } from "
 import type { ProductModelPackage } from "./product-model-store.ts";
 import { decideProduct } from "./product-policy.ts";
 import { exampleKey, productGroup } from "./product-training.ts";
+import { reviewPresentation, type ReviewPresentationSource } from "./review-presentation.ts";
+
+type ReviewSnapshot = TrainingSource &
+  Partial<Pick<ReviewPresentationSource, "offer_name" | "catalog_name">>;
 
 export const REVIEW_ARCHIVE_LIMIT = 10000;
 export const REVIEW_SCORE_LIMIT = 600;
@@ -17,6 +21,10 @@ export type ReviewCard = {
   category: string;
   description: string;
   reason: "conflict" | "uncertain" | "sample";
+  displayName: string;
+  otherNames: string[];
+  imageUrl: string | null;
+  shortName: boolean;
 };
 export function reviewedKey(row: ProductExample) {
   return createHash("sha256").update(exampleKey(row)).digest("hex");
@@ -32,12 +40,13 @@ function reviewable(row: TrainingSource, controls: Set<string>) {
   );
 }
 export function reviewCandidates(
-  snapshots: TrainingSource[],
+  snapshots: ReviewSnapshot[],
   reviewed: Set<string>,
   model: ProductModelPackage | null,
   controls: Set<string>,
 ): ReviewCard[] {
   const weak = prepareTrainingData(snapshots.filter((row) => reviewable(row, controls)));
+  const originals = new Map(snapshots.map((row) => [row.snapshot_id, row]));
   const seen = new Set<string>();
   const candidates = weak
     .flatMap((row) => {
@@ -67,6 +76,7 @@ export function reviewCandidates(
           category: row.category,
           description: row.description,
           reason,
+          ...reviewPresentation(originals.get(row.provenance.snapshotId)!),
         },
         rank: conflict ? 0 : uncertain ? 1 : 2,
         distance: Math.abs(score - 0.5),
@@ -91,7 +101,9 @@ export async function loadReviewQueue(
   controls: Set<string>,
 ) {
   const snapshots =
-    await sql.query<TrainingSource>(`select snapshot_id,country,offer_id,name,description,category,variant_key
+    await sql.query<ReviewSnapshot>(`select snapshot_id,country,offer_id,name,description,category,variant_key,
+    case when jsonb_typeof(raw_payload->'name')='string' then raw_payload->>'name' end as offer_name,
+    case when jsonb_typeof(raw_payload->'product'->'name')='string' then raw_payload->'product'->>'name' end as catalog_name
     from offer_archive where country='de' order by observed_at desc,snapshot_id limit ${REVIEW_ARCHIVE_LIMIT}`);
   const existing = await sql.query<{ example_key: string }>(
     "select example_key from product_review_labels",

@@ -12,6 +12,8 @@ try {
   const page = await browser.newPage();
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
+  const productPhotos='https://cdn.marktguru.de/api/v1/offers/**/images/default/0/medium.webp';
+  await page.route(productPhotos,route=>route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="120"><rect width="80" height="120" fill="white"/><text x="8" y="60">Milch</text></svg>'}));
   const errors = [];
   page.on('pageerror', error => { errors.push(error.message); console.error('Browser error:',error.message); });
   await page.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
@@ -54,6 +56,20 @@ try {
   await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
   await loadReview.click();
   await page.getByTestId('review-card').waitFor();
+  await page.getByText('Товар: Alpen Bio Frische Milch',{exact:true}).waitFor();
+  await page.getByText('Другое название в источнике: Frische Milch',{exact:true}).waitFor();
+  await page.getByTestId('review-image').scrollIntoViewIfNeeded();
+  await page.getByTestId('review-image').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw new Error('Review photo did not load');});
+  assert.match(await page.getByTestId('review-image').getAttribute('src'),/^https:\/\/cdn\.marktguru\.de\/api\/v1\/offers\/compose-smoke-milk\//);
+  // An expired/blocked CDN image must leave the card usable with an explicit fallback.
+  await page.unroute(productPhotos);
+  await page.route(productPhotos,route=>route.abort());
+  await page.reload();
+  await page.getByText('Нейросеть товаров',{exact:true}).click();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await page.getByRole('button',{name:'Загрузить примеры для проверки',exact:true}).click();
+  await page.getByTestId('review-card').scrollIntoViewIfNeeded();
+  await page.getByTestId('review-image-unavailable').waitFor();
   const initialQuery=await page.getByTestId('review-card').locator('p').first().innerText();
   await page.getByRole('button',{name:'Пропустить',exact:true}).click();
   await page.getByText('Проверенных примеров в базе: 0.',{exact:true}).waitFor();
@@ -108,7 +124,7 @@ try {
   assert.equal(await other.getByRole('button',{name:'Обучить нейросеть',exact:true}).isDisabled(),true);
   await other.close();
   assert.deepEqual(errors,[]);
-  console.log('HTTP browser checks passed: lists, cache search, history, authenticated review/skip/correction/persistence, background training and cross-page result');
+  console.log('HTTP browser checks passed: lists, cache search, history, fuller source names and decoded photos with failure fallback, authenticated review/correction/persistence, training and cross-page result');
 } finally {
   await browser.close();
 }

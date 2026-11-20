@@ -7,6 +7,7 @@ import { newProductNet, type ProductExample } from "./product-net.ts";
 import type { ProductModelPackage } from "./product-model-store.ts";
 import { readReviewedLabels } from "./product-model-store.ts";
 import { prepareProductDataset, productGroup } from "./product-training.ts";
+import { reviewPresentation } from "./review-presentation.ts";
 import {
   loadReviewQueue,
   reviewCandidates,
@@ -23,6 +24,34 @@ const snapshot: TrainingSource = {
   description: "Bio 1 l",
   variant_key: "{}",
 };
+test("review presents fuller source titles and safe CDN photos without changing training identity", () => {
+  const row = { ...snapshot, offer_name: "Alpen Bio Frische Milch", catalog_name: snapshot.name };
+  const [card] = reviewCandidates([row], new Set(), null, new Set());
+  assert.equal(card.displayName, row.offer_name);
+  assert.equal(card.name, snapshot.name);
+  assert.deepEqual(card.otherNames, [snapshot.name]);
+  assert.equal(
+    card.imageUrl,
+    "https://cdn.marktguru.de/api/v1/offers/o/images/default/0/medium.webp",
+  );
+  assert.equal(
+    card.id,
+    reviewedKey({ ...snapshot, intent: card.intent, positive: true, source: "human" }),
+  );
+  const short = reviewPresentation({ ...snapshot, name: "Original" });
+  assert.equal(short.displayName, "Original");
+  assert.equal(short.shortName, true);
+  const other = reviewPresentation({ ...snapshot, name: "Cremefine", offer_name: "Rama" });
+  assert.equal(other.displayName, "Cremefine");
+  assert.deepEqual(other.otherNames, ["Rama"]);
+  assert.equal(reviewPresentation({ ...snapshot, country: "unknown" }).imageUrl, null);
+  assert.equal(reviewPresentation({ ...snapshot, offer_id: "" }).imageUrl, null);
+  const encoded = new URL(
+    reviewPresentation({ ...snapshot, offer_id: "https://evil.test/a?x=1" }).imageUrl!,
+  );
+  assert.equal(encoded.hostname, "cdn.marktguru.de");
+  assert.equal(encoded.search, "");
+});
 test("review queue excludes controls, oversized texts, non-German and already reviewed examples", () => {
   const first = reviewCandidates(
     [snapshot, { ...snapshot, snapshot_id: "duplicate" }],
@@ -78,14 +107,28 @@ test("archive answers persist human labels, reject stale overwrites, and enter t
       query: async <T>(text: string, params?: unknown[]) => (await db.query<T>(text, params)).rows,
     };
     await archiveOffers(sql, "de", "73431", [
-      { id: "milk", name: snapshot.name, description: snapshot.description, price: 1.29 },
+      {
+        id: "milk",
+        name: "Alpen Bio Frische Milch",
+        product: { name: snapshot.name },
+        description: snapshot.description,
+        price: 1.29,
+      },
     ]);
     await archiveOffers(sql, "de", "10115", [
-      { id: "other-region", name: snapshot.name, description: snapshot.description, price: 1.79 },
+      {
+        id: "other-region",
+        name: "Alpen Bio Frische Milch",
+        product: { name: snapshot.name },
+        description: snapshot.description,
+        price: 1.79,
+      },
     ]);
     await archiveOffers(sql, "at", "1010", [{ id: "at", name: "Hafermilch", price: 2 }]);
     const before = await loadReviewQueue(sql, null, new Set());
     assert.equal(before.cards.length, 2);
+    assert.ok(before.cards.every((card) => card.displayName === "Alpen Bio Frische Milch"));
+    assert.ok(before.cards.every((card) => card.name === snapshot.name));
     assert.equal(before.reviewedCount, 0);
     const card = before.cards.find((row) => row.intent === "Milch")!;
     const answer = { snapshotId: card.snapshotId, intent: card.intent, positive: true };

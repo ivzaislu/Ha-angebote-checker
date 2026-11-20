@@ -3,6 +3,36 @@ import { useServerFn } from "@tanstack/react-start";
 import { neuralReviewQueue, answerNeuralReview } from "@/lib/scan";
 import type { ReviewCard } from "@/lib/product-review-queue";
 
+function ReviewPhoto({ url, name }: { url: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed)
+    return (
+      <p className="text-xs text-muted" data-testid="review-image-unavailable">
+        Фото недоступно. Если названия и описания недостаточно, пропустите пример.
+      </p>
+    );
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block"
+      title="Открыть фото крупнее"
+    >
+      <img
+        src={url}
+        alt={`Фото товара: ${name}`}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        className="h-48 w-full rounded-md border border-line bg-white object-contain"
+        data-testid="review-image"
+        onError={() => setFailed(true)}
+      />
+    </a>
+  );
+}
+
 export function ProductReviewPanel({
   ownerKey,
   reviewedCount,
@@ -89,7 +119,20 @@ export function ProductReviewPanel({
           <p className="text-sm">
             Запрос: <strong>{card.intent}</strong>
           </p>
-          <p className="text-sm font-medium">Товар: {card.name}</p>
+          <p className="break-words text-sm font-medium" data-testid="review-product-name">
+            Товар: {card.displayName}
+          </p>
+          {card.otherNames.map((name) => (
+            <p key={name} className="break-words text-xs text-muted">
+              Другое название в источнике: {name}
+            </p>
+          ))}
+          <ReviewPhoto key={card.snapshotId} url={card.imageUrl} name={card.displayName} />
+          {card.shortName ? (
+            <p className="text-xs text-muted">
+              В архиве короткое название. Уточните товар по фото и описанию или пропустите пример.
+            </p>
+          ) : null}
           {card.category ? <p className="text-xs text-muted">Категория: {card.category}</p> : null}
           {card.description ? (
             <p className="whitespace-pre-wrap text-sm">{card.description}</p>
