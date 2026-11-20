@@ -66,4 +66,19 @@ jobs:
           image='ghcr.io/ivzaislu/ha-angebote-checker:vision-${{ github.sha }}'
           docker tag '${{ steps.upstream.outputs.image }}' "$image"
           docker push "$image"
-          docker image inspect "$image" --format '{{json .RepoDigests}}'
+          # A cross-repository push can rewrite the manifest. RepoDigests in the
+          # local Docker cache can retain the old upstream digest: resolve remotely.
+          digest="$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')"
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo 'Invalid published manifest digest' >&2
+            exit 1
+          fi
+          published="ghcr.io/ivzaislu/ha-angebote-checker@$digest"
+          docker pull --platform linux/amd64 "$published"
+          printf '%s\n' "$published" > .vision/published-image.txt
+          echo "PUBLISHED_VISION_IMAGE=$published"
+          echo "Verified vision runtime: \`$published\`" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vision-runtime-digest
+          path: .vision/published-image.txt
