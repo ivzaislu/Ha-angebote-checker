@@ -14,7 +14,7 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { neuralModelStatus, archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import { trainNeuralModel, neuralTrainingStatus, neuralModelStatus, archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import type { BrainView } from "@/lib/brain";
 import { recognizeVariant } from "@/lib/product-variants";
 import { useAngebote, type LastScan } from "@/lib/store";
@@ -259,6 +259,13 @@ export function AngeboteApp() {
   const catalogHints = useServerFn(productHints);
   const brainOf = useServerFn(brainSnapshot);
   const modelStatus = useServerFn(neuralModelStatus);
+  const trainingStatus = useServerFn(neuralTrainingStatus);
+  const startTraining = useServerFn(trainNeuralModel);
+  const [training, setTraining] = useState<Awaited<ReturnType<typeof neuralTrainingStatus>> | null>(null);
+  const [trainingKey, setTrainingKey] = useState("");
+  const [startingTraining, setStartingTraining] = useState(false);
+  const [trainingError, setTrainingError] = useState("");
+  const trainingBusy = training?.job?.status === "queued" || training?.job?.status === "running";
   const [neural, setNeural] = useState<Awaited<ReturnType<typeof neuralModelStatus>> | null>(null);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
@@ -290,7 +297,35 @@ export function AngeboteApp() {
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
     void modelStatus().then(setNeural).catch(()=>undefined);
+    void trainingStatus().then(setTraining).catch(() => setTrainingError("Не удалось получить состояние обучения"));
   }, []);
+
+  useEffect(() => {
+    if (!trainingBusy) return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      void trainingStatus().then(async (status) => {
+        if (cancelled) return;
+        setTraining(status);
+        setTrainingError("");
+        if (status.job?.status !== "queued" && status.job?.status !== "running") {
+          const model = await modelStatus();
+          if (!cancelled) setNeural(model);
+        }
+      }).catch(() => { if (!cancelled) setTrainingError("Связь прервана; повторяем проверку состояния обучения…"); });
+    }, 3000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [trainingBusy]);
+
+  async function beginTraining() {
+    setStartingTraining(true);
+    setTrainingError("");
+    try {
+      setTraining(await startTraining({ data: { key: trainingKey } }));
+    } catch (error) {
+      setTrainingError(error instanceof Error ? error.message : "Не удалось запустить обучение");
+    } finally { setStartingTraining(false); }
+  }
 
   useEffect(() => {
     setHighlight(0);
@@ -653,8 +688,39 @@ export function AngeboteApp() {
               В подготовленном наборе: ручных меток {neural.active.sources.human ?? 0}, авторских учебных {neural.active.sources.curated ?? 0}, автоматических {neural.active.sources.rules ?? 0}.
             </p> : null}
             <p className="mt-2 text-xs text-muted">
-              Обновление листовок собирает данные. Обучение и переключение версий выполняются отдельной командой на сервере. Контрольный набор авторский; его результат не означает такую же точность на всех акциях. При неопределённом ответе используются правила.
+              Обучение использует накопленный архив и проверенные метки. Новая версия включается только после проверки качества. Контрольный набор авторский; его результат не означает такую же точность на всех акциях. При неопределённом ответе используются правила.
             </p>
+            <div className="mt-3 space-y-2">
+              {training?.configured ? <>
+                <label htmlFor="training-key" className="block text-sm">Ключ владельца</label>
+                <input id="training-key" type="password" autoComplete="off" value={trainingKey}
+                  onChange={event => setTrainingKey(event.target.value)}
+                  className="h-11 w-full rounded-md border border-line bg-transparent px-3"
+                  placeholder="Ключ для запуска обучения" />
+                <button type="button" onClick={() => void beginTraining()}
+                  disabled={startingTraining || trainingBusy || !trainingKey.trim()}
+                  className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50">
+                  {startingTraining ? "Запускаем…" : trainingBusy ? "Обучение выполняется…" : "Обучить нейросеть"}
+                </button>
+                <p className="text-xs text-muted">Страницу можно закрыть: обучение продолжится на сервере. Ключ хранится только до перезагрузки страницы.</p>
+              </> : training ? <p className="text-sm text-muted">Для кнопки обучения настройте ключ владельца TRAINING_ADMIN_TOKEN на сервере.</p> : null}
+              <div role="status" data-testid="training-status" className="text-sm">
+                {training?.job ? <>
+                  <p>{training.job.status === "queued" ? "Обучение в очереди…"
+                    : training.job.status === "running" ? training.job.stage === "preparing" ? "Подготовка обучающих данных…"
+                      : training.job.stage === "checking" ? "Проверка и сохранение модели…" : "Нейросеть обучается…"
+                    : training.job.status === "succeeded" ? "Обучение завершено. Модель включена."
+                    : training.job.status === "rejected" ? "Обучение завершено. Качество не прошло проверку; действующая модель сохранена."
+                    : training.job.error}</p>
+                  {training.job.result ? <p className="mt-1 text-xs text-muted">
+                    Версия {training.job.result.candidate}. Обучающих примеров: {training.job.result.trainCount}; проверочных: {training.job.result.validationCount}; контрольных: {training.job.result.testCount}.
+                    {training.job.result.deployedControlAccuracy !== null ? ` Результат на авторском контроле: ${(training.job.result.deployedControlAccuracy * 100).toFixed(2)}%.` : ""}
+                  </p> : null}
+                  {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{reason}</p>)}
+                </> : null}
+              </div>
+              {trainingError ? <p role="alert" className="text-sm">{trainingError}</p> : null}
+            </div>
             <p className="mt-2 text-sm text-muted">Названия из ранее накопленного словаря:</p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">

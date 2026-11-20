@@ -44,8 +44,30 @@ try {
   await page.getByText('из сохранённых акций',{exact:true}).waitFor();
   await page.getByRole('button',{name:'История цен',exact:true}).click();
   await page.getByText('От 1.29 до 1.79 € · наблюдений: 2',{exact:true}).waitFor();
+  // Training must be authenticated and keep working after the page is closed.
+  await page.getByText('Нейросеть товаров',{exact:true}).click();
+  await page.locator('#training-key').fill('wrong-key');
+  await page.getByRole('button',{name:'Обучить нейросеть',exact:true}).click();
+  await page.getByRole('alert').waitFor();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await page.getByRole('button',{name:'Обучить нейросеть',exact:true}).click();
+  await page.getByRole('button',{name:'Обучение выполняется…',exact:true}).waitFor();
+  await page.close();
+  // A new page sees the durable task after the initiating page has been closed.
+  const other = await browser.newPage();
+  other.on('pageerror', error => errors.push(error.message));
+  await other.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
+  await other.getByText('Нейросеть товаров',{exact:true}).click();
+  await other.getByTestId('training-status').getByText(/Подготовка обучающих данных|Нейросеть обучается|Проверка и сохранение|Обучение в очереди|Обучение завершено/).first().waitFor();
+  await other.getByTestId('training-status').getByText('Обучение завершено. Модель включена.',{exact:true}).waitFor({timeout:180_000});
+  await other.reload();
+  await other.getByText('Нейросеть товаров',{exact:true}).click();
+  await other.getByTestId('training-status').getByText('Обучение завершено. Модель включена.',{exact:true}).waitFor();
+  assert.equal(await other.locator('#training-key').inputValue(),'');
+  assert.equal(await other.getByRole('button',{name:'Обучить нейросеть',exact:true}).isDisabled(),true);
+  await other.close();
   assert.deepEqual(errors,[]);
-  console.log('HTTP browser checks passed: add/remove, new list, reload persistence, active trained v2 model, cache-first search with live Marktguru blocked and real price history');
+  console.log('HTTP browser checks passed: lists, cache search, history, authenticated background training, cross-page status and persisted training result');
 } finally {
   await browser.close();
 }

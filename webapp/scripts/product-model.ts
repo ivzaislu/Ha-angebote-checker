@@ -1,4 +1,4 @@
-/** Operator-only learning/activation. Public web requests cannot invoke this CLI. */
+/** Learning/activation CLI, also used by the authenticated background worker. */
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import pg from "pg";
@@ -240,10 +240,12 @@ try {
           "Archive and reviewed data are empty; collect offers before production training",
         );
       const dataset = prepareProductDataset([...authored.curriculum, ...weak, ...reviewed], test);
+      console.error("PRODUCT_TRAINING_STAGE=training");
       const { net, report } = trainProductModel(dataset, {
         epochs,
         champion: champion ?? undefined,
       });
+      console.error("PRODUCT_TRAINING_STAGE=checking");
       const candidate = await saveProductCandidate(sql, net, report);
       let activated = false;
       if (activate && report.eligible) {

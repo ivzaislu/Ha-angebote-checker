@@ -1,8 +1,9 @@
 # Isolated PostgreSQL fixture for CI; not part of the production configuration.
 services:
   app:
+    mem_limit: 384m
     environment:
-      NODE_OPTIONS: --import /checks/deny-marktguru.mjs
+      NODE_OPTIONS: --max-old-space-size=256 --import /checks/deny-marktguru.mjs
     volumes:
       - ./deploy/deny-marktguru.mjs:/checks/deny-marktguru.mjs:ro
   db:

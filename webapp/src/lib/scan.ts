@@ -90,9 +90,22 @@ export const archivedPriceHistory = createServerFn({ method: "POST" })
     return priceHistory(await getSql(), data.country, data.name, data.zip);
   });
 
-/** Public read-only status; training and activation are operator-only CLI actions. */
+/** Public read-only model status. */
 export const neuralModelStatus = createServerFn({method:"GET"})
   .handler(async()=>{
     const {productModelStatus}=await import("@/lib/product-model.server");
     return productModelStatus();
+  });
+
+export const neuralTrainingStatus = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { trainingStatus } = await import("@/lib/product-training.server");
+    return trainingStatus();
+  });
+
+export const trainNeuralModel = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ key: z.string().max(512) }).parse(data))
+  .handler(async ({ data }) => {
+    const { startTraining } = await import("@/lib/product-training.server");
+    return startTraining(data.key);
   });
