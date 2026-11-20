@@ -1,0 +1,69 @@
+name: Local vision experiment
+on:
+  push:
+    branches: [feature/self-learning-product-catalog]
+    paths:
+      - 'deploy/vision.py'
+      - 'deploy/test_vision.py'
+      - 'deploy/vision-models.json'
+      - 'deploy/compose.vision.yaml'
+      - '.github/workflows/local-vision-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  vision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Test downloader, isolation and pixel request
+        run: python3 -m unittest discover -s deploy -p test_vision.py -v
+      - name: Resolve upstream CPU image to immutable digest
+        id: upstream
+        run: |
+          docker pull --platform linux/amd64 ghcr.io/ggml-org/llama.cpp:server
+          image="$(docker image inspect ghcr.io/ggml-org/llama.cpp:server --format '{{index .RepoDigests 0}}')"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "Resolved CPU runtime: $image"
+      - name: Download pinned model and vision projector with SHA256 checks
+        run: python3 deploy/vision.py prepare --image '${{ steps.upstream.outputs.image }}'
+      - name: Start CPU vision service under experimental memory limit
+        run: python3 deploy/vision.py start
+      - name: Exercise real image decoding and local multimodal inference
+        run: |
+          python3 -c 'from deploy.test_vision import png_fixture;from pathlib import Path;Path(".vision/pipeline.png").write_bytes(png_fixture())'
+          python3 deploy/vision.py bench --image-file .vision/pipeline.png
+          python3 deploy/vision.py status
+      - name: Diagnostics
+        if: failure()
+        run: |
+          if [ -f .vision/config.json ]; then
+            python3 deploy/vision.py status || true
+            python3 deploy/vision.py logs || true
+          fi
+      - name: Stop only the experimental service
+        if: always()
+        run: |
+          if [ -f .vision/config.json ]; then python3 deploy/vision.py stop; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vision-pipeline-report
+          path: .vision/result-*.json
+          if-no-files-found: ignore
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested CPU runtime
+        run: |
+          image='ghcr.io/ivzaislu/ha-angebote-checker:vision-${{ github.sha }}'
+          docker tag '${{ steps.upstream.outputs.image }}' "$image"
+          docker push "$image"
+          docker image inspect "$image" --format '{{json .RepoDigests}}'

@@ -1,4 +1,5 @@
 .git
+.vision
 **/node_modules
 **/.output
 **/.vercel
