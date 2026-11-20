@@ -118,6 +118,28 @@ test("distant food-category negatives do not crowd the queue", () => {
   );
 });
 
+test("automatic category-negative expansion is bounded and stable across regional copies", () => {
+  const cosmetic = {
+    ...snapshot,
+    name: "Creme",
+    category: "Gesichtspflege",
+    description: "200-ml-Tiegel",
+  };
+  const examples = prepareTrainingData([cosmetic]);
+  assert.equal(examples.length, 3);
+  assert.ok(
+    examples.every((row) => !row.positive && row.needsReview && row.labelSource === "rules-v1"),
+  );
+  const duplicates = prepareTrainingData([
+    cosmetic,
+    { ...cosmetic, snapshot_id: "different", offer_id: "other" },
+  ]);
+  assert.deepEqual(
+    duplicates.map((row) => row.intent),
+    examples.map((row) => row.intent),
+  );
+});
+
 test("archive answers persist human labels, reject stale overwrites, and enter the next training dataset", async () => {
   const db = new PGlite();
   try {

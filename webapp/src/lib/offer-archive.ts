@@ -3,6 +3,7 @@ import { productKey, safePrice, validProductName } from "./product-knowledge.ts"
 import { recognizeVariant } from "./product-variants.ts";
 import { inferUnitPrice } from "./unit-price.ts";
 import { EXACT_QUERIES, hardReject, offerFits } from "./exact.ts";
+import { incompatibleCategory } from "./product-category.ts";
 
 export type ArchiveOffer = {
   id?: string | number;
@@ -93,9 +94,16 @@ export function prepareTrainingData(rows: TrainingSource[]) {
   const seen = new Set<string>();
   return rows.flatMap(row => {
     const group = productKey(row.name);
+    // Do not expand one non-food item into every unrelated food intent. Keep
+    // three stable weak examples; prices/regions do not change this sample.
+    const categoryMismatches=EXACT_QUERIES.filter(rule=>incompatibleCategory(rule.query,row.category));
+    const sampled=new Set(categoryMismatches.map(rule=>({query:rule.query,key:hash(JSON.stringify([group,productKey(row.description),row.category,rule.query]))}))
+      .sort((a,b)=>a.key.localeCompare(b.key)).slice(0,3).map(row=>row.query));
+    const excluded=new Set(categoryMismatches.map(rule=>rule.query));
     // Keep every occurrence of a product in the same split, including across regions.
     const split = parseInt(hash(group).slice(0,8),16) % 10 === 0 ? "validation" : "train";
     return EXACT_QUERIES.flatMap(rule => {
+      if(excluded.has(rule.query) && !sampled.has(rule.query))return [];
       const positive = offerFits(rule.query,row.name,row.description,row.category);
       const negative = hardReject(rule.query,row.name,row.description,row.category);
       if (positive === negative) return [];
