@@ -31,7 +31,7 @@ export async function readProductCandidate(
   if (!row) return null;
   if (
     !validProductNet(row.model) ||
-    row.report.schemaVersion !== 1 ||
+    ![1, 2].includes(row.report.schemaVersion) ||
     !Array.isArray(row.report.supportedIntents) ||
     !Array.isArray(row.report.vocabulary)
   )
@@ -53,6 +53,11 @@ export async function activateProductCandidate(
 ): Promise<void> {
   const model = await readProductCandidate(sql, id);
   if (!model || !model.report.eligible) throw new Error("Candidate did not pass the quality gate");
+  if (
+    action === "activate" &&
+    (model.report.schemaVersion !== 2 || model.report.deployment?.version !== 2)
+  )
+    throw new Error("Obsolete evaluation policy; recheck the candidate before activation");
   if (action === "rollback") {
     const rows = await sql.query(
       "select id from product_model_events where model_id=$1 and action in ('activate','rollback') limit 1",

@@ -8,7 +8,7 @@ import {
   prepareProductDataset,
   trainProductModel,
   classificationMetrics,
-  qualityGate,
+  evaluateTrainedProduct,
   exampleKey,
 } from "../src/lib/product-training.ts";
 import { productProbability, type ProductExample } from "../src/lib/product-net.ts";
@@ -22,12 +22,15 @@ import {
   readReviewedLabels,
   deactivateProductModel,
 } from "../src/lib/product-model-store.ts";
-import { offerFits } from "../src/lib/exact.ts";
+import { qualityGate, evaluateProductPolicy } from "../src/lib/product-evaluation.ts";
+import { policyForModel, decideWithProductPolicy } from "../src/lib/product-policy.ts";
 
 const [command, ...args] = process.argv.slice(2);
-if (!["train", "status", "activate", "rollback", "deactivate", "review"].includes(command))
+if (
+  !["train", "status", "activate", "rollback", "deactivate", "review", "recheck"].includes(command)
+)
   throw new Error(
-    "Usage: brain train [--activate-if-qualified] [--reviewed file] [--epochs 1..100] | status | deactivate | activate ID | rollback ID | review output.jsonl",
+    "Usage: brain train [--activate-if-qualified] [--reviewed file] [--epochs 1..100] | status | deactivate | activate ID | rollback ID | review output.jsonl [--model ID] | recheck ID [--activate-if-qualified]",
   );
 if (!process.env.DATABASE_URL?.trim())
   throw new Error("A persistent DATABASE_URL is required; apply migrations first");
@@ -52,9 +55,19 @@ const summary = (report: Awaited<ReturnType<typeof trainProductModel>>["report"]
   sources: report.sources,
   epochs: report.epochs,
   bestEpoch: report.bestEpoch,
-  validationAccuracy: report.validation.accuracy,
-  controlAccuracy: report.test.accuracy,
-  rulesControlAccuracy: report.rules.accuracy,
+  evaluationPolicy: report.deployment?.version ?? 1,
+  rawValidationAgreement: report.validation.accuracy,
+  rawControlAccuracy: report.test.accuracy,
+  trustedValidationAccuracy: report.trustedValidation?.accuracy ?? null,
+  deployedValidationAccuracy: report.deployment?.trustedValidation.all.accuracy ?? null,
+  deployedControlAccuracy: report.deployment?.control.all.accuracy ?? null,
+  deployedControlFalseMatches: report.deployment?.control.all.fp ?? null,
+  baselineName: report.deployment?.baselineName ?? "legacy comparison",
+  baselineControlFalseMatches: report.deployment?.baselineControl.all.fp ?? null,
+  neuralValidationAcceptPrecision:
+    report.deployment?.trustedValidation.neural.acceptedPrecision ?? null,
+  weakNeuralAgreementPrecision: report.deployment?.weakValidation.neural.acceptedPrecision ?? null,
+  weakNeuralConflicts: report.deployment?.weakValidation.neural.confidentErrors ?? null,
   eligible: report.eligible,
   reasons: report.reasons,
   warning: report.labelWarning,
@@ -89,17 +102,15 @@ try {
         .digest("hex");
       if (candidate.report.controlFingerprint !== fingerprint)
         throw new Error("Control set changed; retrain this candidate");
-      const current = champion
-        ? classificationMetrics(test, (row) => productProbability(champion.net, row))
-        : classificationMetrics(test, (row) =>
-            offerFits(row.intent, row.name, row.description, row.category) ? 1 : 0,
-          );
-      const reasons = qualityGate(
-        candidate.report.validation,
-        classificationMetrics(test, (row) => productProbability(candidate.net, row)),
-        candidate.report.trainCount,
-        current,
-      );
+      if (candidate.report.schemaVersion !== 2 || !candidate.report.deployment)
+        throw new Error("Obsolete evaluation policy; recheck the candidate");
+      const evaluation = {
+        ...candidate.report.deployment,
+        control: evaluateProductPolicy(policyForModel(candidate), test),
+        baselineControl: evaluateProductPolicy(champion ? policyForModel(champion) : null, test),
+        baselineName: champion ? ("active model" as const) : ("rules baseline" as const),
+      };
+      const reasons = qualityGate(evaluation, candidate.report.trainCount);
       if (reasons.length) throw new Error(`Activation refused: ${reasons.join("; ")}`);
     }
     await activateProductCandidate(sql, candidate.id, activeId, command);
@@ -117,16 +128,40 @@ try {
       source: "rules" as const,
     }));
     if (command === "review") {
-      if (args.length !== 1) throw new Error("Specify a new JSONL output path");
+      if (args.length !== 1 && !(args.length === 3 && args[1] === "--model"))
+        throw new Error("review requires output.jsonl [--model ID]");
+      const selected = args[2] ? await readProductCandidate(sql, args[2]) : champion;
+      if (args[2] && !selected) throw new Error("Unknown review model");
       const existing = new Set((await readReviewedLabels(sql)).map(exampleKey));
       const seed = JSON.parse(
         await readFile(new URL("../src/lib/product-seed.json", import.meta.url), "utf8"),
       );
-      const net = champion?.net ?? seed.net;
+      const inspected = selected ?? seed;
+      const net = inspected.net;
+      const inspectedPolicy = policyForModel(inspected);
       const rows = weak
-        .filter((row) => row.description.length<=600 && row.category.length<=180 && !existing.has(exampleKey(row)))
-        .map((row) => ({ ...row, reviewed: false, modelScore: productProbability(net, row) }))
-        .sort((a, b) => Math.abs(a.modelScore - 0.5) - Math.abs(b.modelScore - 0.5))
+        .filter(
+          (row) =>
+            row.description.length <= 600 &&
+            row.category.length <= 180 &&
+            !existing.has(exampleKey(row)),
+        )
+        .map((row) => {
+          const decision = decideWithProductPolicy(inspectedPolicy, row);
+          return {
+            ...row,
+            reviewed: false,
+            modelScore: productProbability(net, row),
+            deployedDecision: decision.keep,
+            neuralDecision: decision.fromBrain,
+            unreviewedConflict: decision.fromBrain && decision.keep !== row.positive,
+          };
+        })
+        .sort(
+          (a, b) =>
+            Number(b.unreviewedConflict) - Number(a.unreviewedConflict) ||
+            Math.abs(a.modelScore - 0.5) - Math.abs(b.modelScore - 0.5),
+        )
         .slice(0, 100);
       await writeFile(
         args[0],
@@ -136,6 +171,45 @@ try {
       console.log(
         `${rows.length} suggestions written; correct positive and set reviewed=true only after checking each example`,
       );
+    } else if (command === "recheck") {
+      if (!args[0] || args.length > 2 || (args[1] && args[1] !== "--activate-if-qualified"))
+        throw new Error("recheck requires ID [--activate-if-qualified]");
+      const original = await readProductCandidate(sql, args[0]);
+      if (!original) throw new Error("Unknown candidate");
+      const dataset = prepareProductDataset(
+        [...authored.curriculum, ...weak, ...(await readReviewedLabels(sql))],
+        test,
+      );
+      if (dataset.fingerprint !== original.report.datasetFingerprint)
+        throw new Error(
+          "Dataset changed since this candidate was trained; run train instead of recheck",
+        );
+      const report = evaluateTrainedProduct(
+        original.net,
+        dataset,
+        { epochs: original.report.epochs, bestEpoch: original.report.bestEpoch },
+        champion ?? undefined,
+      );
+      const candidate = await saveProductCandidate(sql, original.net, report);
+      let activated = false;
+      if (args[1] && report.eligible) {
+        await activateProductCandidate(sql, candidate.id, activeId);
+        activated = true;
+      }
+      console.log(
+        JSON.stringify(
+          {
+            candidate: candidate.id,
+            recheckedFrom: original.id,
+            weightsUnchanged: true,
+            activated,
+            ...summary(report),
+          },
+          null,
+          2,
+        ),
+      );
+      if (args[1] && !activated) process.exitCode = 2;
     } else {
       let reviewed: ProductExample[] = [],
         epochs = 40,
@@ -166,7 +240,10 @@ try {
           "Archive and reviewed data are empty; collect offers before production training",
         );
       const dataset = prepareProductDataset([...authored.curriculum, ...weak, ...reviewed], test);
-      const { net, report } = trainProductModel(dataset, { epochs, champion: champion?.net });
+      const { net, report } = trainProductModel(dataset, {
+        epochs,
+        champion: champion ?? undefined,
+      });
       const candidate = await saveProductCandidate(sql, net, report);
       let activated = false;
       if (activate && report.eligible) {

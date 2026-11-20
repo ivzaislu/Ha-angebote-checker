@@ -19,7 +19,7 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/scripts/archive-marktguru.ts /app/scripts/register-alias.mjs /app/scripts/alias-loader.mjs ./scripts/
 COPY --from=build /app/src/lib/offer-archive.ts /app/src/lib/product-knowledge.ts /app/src/lib/product-variants.ts /app/src/lib/unit-price.ts /app/src/lib/exact.ts /app/src/lib/corpus.server.ts ./src/lib/
 COPY --from=build /app/scripts/product-model.ts ./scripts/product-model.ts
-COPY --from=build /app/src/lib/product-net.ts /app/src/lib/product-data.ts /app/src/lib/product-training.ts /app/src/lib/product-review.ts /app/src/lib/product-model-store.ts /app/src/lib/product-curriculum.json /app/src/lib/product-benchmark.json /app/src/lib/product-seed.json ./src/lib/
+COPY --from=build /app/src/lib/product-net.ts /app/src/lib/product-policy.ts /app/src/lib/product-metrics.ts /app/src/lib/product-evaluation.ts /app/src/lib/product-data.ts /app/src/lib/product-training.ts /app/src/lib/product-review.ts /app/src/lib/product-model-store.ts /app/src/lib/product-curriculum.json /app/src/lib/product-benchmark.json /app/src/lib/product-seed.json ./src/lib/
 USER node
 EXPOSE 8080
 CMD ["node", ".output/server/index.mjs"]

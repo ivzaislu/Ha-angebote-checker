@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import {
+  evaluateProductPolicy,
+  type DeploymentEvaluation,
+  type DeploymentMetrics,
+} from "./product-evaluation.ts";
 import { authoredDataset } from "./product-data.ts";
 import { PGlite } from "@electric-sql/pglite";
 import {
@@ -15,6 +20,7 @@ import {
 import {
   prepareProductDataset,
   trainProductModel,
+  evaluateTrainedProduct,
   classificationMetrics,
   qualityGate,
   productGroup,
@@ -120,6 +126,7 @@ test("training is deterministic, never fits the control set and reproduces the b
   const changed = { ...dataset, test: control.map((row) => ({ ...row, positive: !row.positive })) };
   const alternate = trainProductModel(changed);
   assert.deepEqual(first.net, alternate.net);
+  assert.deepEqual(first.report.supportedIntents, alternate.report.supportedIntents);
   assert.equal(first.report.eligible, true, first.report.reasons.join("; "));
   const seed: ProductModelPackage = await load("product-seed.json");
   const scores = classificationMetrics(control, (row) => productProbability(seed.net, row));
@@ -131,11 +138,35 @@ test("training is deterministic, never fits the control set and reproduces the b
   assert.ok(control.every((row) => !groups.has(productGroup(row))));
 });
 
-test("empty/one-class validation and regressing candidates cannot pass the gate", () => {
+test("rechecking evaluates immutable weights and leaves the original report untouched", async () => {
+  const seed: ProductModelPackage = await load("product-seed.json");
+  const authored = authoredDataset(
+    await load("product-curriculum.json"),
+    await load("product-benchmark.json"),
+  );
+  const dataset = prepareProductDataset(authored.curriculum, authored.control);
+  const legacy = {
+    ...seed,
+    report: {
+      ...seed.report,
+      schemaVersion: 1 as const,
+      deployment: undefined,
+      eligible: false,
+      reasons: ["legacy"],
+    },
+  };
+  const original = JSON.stringify(legacy);
+  const report = evaluateTrainedProduct(legacy.net, dataset, {
+    epochs: legacy.report.epochs,
+    bestEpoch: legacy.report.bestEpoch,
+  });
+  assert.equal(JSON.stringify(legacy), original);
+  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.deployment?.version, 2);
+});
+
+test("deployed-policy gates retain precision thresholds and block unresolved weak-label conflicts", () => {
   const empty = classificationMetrics([], () => 0.5);
-  assert.equal(empty.accuracy, null);
-  assert.equal(empty.acceptedPrecision, null);
-  assert.ok(qualityGate(empty, empty, 0).length > 0);
   const rows: ProductExample[] = Array.from({ length: 50 }, (_, i) => ({
     intent: "Milch",
     name: `Milk ${i}`,
@@ -145,15 +176,85 @@ test("empty/one-class validation and regressing candidates cannot pass the gate"
     source: "curated",
   }));
   const perfect = classificationMetrics(rows, (row) => (row.positive ? 0.99 : 0.01));
-  assert.deepEqual(qualityGate(perfect, perfect, 100), []);
-  const reversed = classificationMetrics(rows, (row) => (row.positive ? 0.01 : 0.99));
+  const pack = (all: typeof perfect): DeploymentMetrics => ({
+    all,
+    neural: all,
+    neuralCoverage: all.count ? 1 : 0,
+  });
+  const evaluation: DeploymentEvaluation = {
+    version: 2,
+    thresholds: { accept: 0.9, reject: 0.1 },
+    scopeSource: "training-and-trusted-validation",
+    supportedIntents: ["Milch"],
+    trustedValidation: pack(perfect),
+    control: pack(perfect),
+    weakValidation: pack(empty),
+    baselineValidation: pack(perfect),
+    baselineControl: pack(perfect),
+    baselineName: "rules baseline",
+    weakConflicts: [],
+  };
+  assert.deepEqual(qualityGate(evaluation, 100), []);
+  assert.ok(qualityGate({ ...evaluation, trustedValidation: pack(empty) }, 100).length > 0);
+  const wrong = classificationMetrics(rows, (row) => (row.positive ? 0.01 : 0.99));
   assert.ok(
-    qualityGate(perfect, reversed, 100, perfect).some((reason) => reason.includes("Regression")),
+    qualityGate({ ...evaluation, control: pack(wrong) }, 100).some((reason) =>
+      reason.includes("false matches"),
+    ),
+  );
+  assert.ok(
+    qualityGate({ ...evaluation, weakValidation: pack(wrong) }, 100).some((reason) =>
+      reason.includes("review required"),
+    ),
   );
 });
 
+test("ambiguous scores are counted at the runtime thresholds, not as deployed false positives", () => {
+  const net = newProductNet();
+  net.w1.fill(0);
+  net.w2.fill(0);
+  net.b1.fill(0);
+  net.b2 = Math.log(0.6 / 0.4);
+  const row: ProductExample = {
+    intent: "Milch",
+    name: "Kaffee",
+    category: "Kaffee",
+    description: "",
+    positive: false,
+    source: "curated",
+  };
+  assert.equal(classificationMetrics([row], (row) => productProbability(net, row)).fp, 1);
+  const actual = evaluateProductPolicy(
+    { id: "test", net, supportedIntents: ["Milch"], vocabulary: ["kaffee"] },
+    [row],
+  );
+  assert.equal(actual.all.fp, 0);
+  assert.equal(actual.neural.count, 0);
+});
+
+test("weak validation labels do not select epochs, while deployed contradictions still block release", async () => {
+  const authored = authoredDataset(
+    await load("product-curriculum.json"),
+    await load("product-benchmark.json"),
+  );
+  const dataset = prepareProductDataset(authored.curriculum, authored.control);
+  const first = trainProductModel(dataset);
+  const weak: ProductExample = {
+    intent: "Milch",
+    name: "Frische Milch",
+    category: "",
+    description: "Bio 1 l",
+    positive: false,
+    source: "rules",
+  };
+  const noisy = trainProductModel({ ...dataset, validation: [...dataset.validation, weak] });
+  assert.deepEqual(first.net, noisy.net);
+  assert.ok(noisy.report.reasons.some((reason) => reason.includes("weak validation")));
+  assert.equal(noisy.report.eligible, false);
+});
+
 test("review suggestions are never silently treated as human labels", () => {
-  assert.throws(()=>parseReviewedExamples("ü".repeat(5_000_001)),/exceeds 10 MB/);
+  assert.throws(() => parseReviewedExamples("ü".repeat(5_000_001)), /exceeds 10 MB/);
   const row = {
     intent: "Haferdrink",
     name: "Haferdrink",
@@ -216,6 +317,13 @@ test("candidate registry preserves versions, refuses failed activation, detects 
     const a = await saveProductCandidate(sql, seed.net, seed.report);
     assert.equal((await saveProductCandidate(sql, seed.net, seed.report)).id, a.id);
     assert.equal(await activeProductModelId(sql), null);
+    const legacy = await saveProductCandidate(sql, seed.net, {
+      ...seed.report,
+      schemaVersion: 1,
+      deployment: undefined,
+    });
+    assert.equal((await readProductCandidate(sql, legacy.id))?.report.schemaVersion, 1);
+    await assert.rejects(activateProductCandidate(sql, legacy.id, null), /Obsolete evaluation/);
     const failed = await saveProductCandidate(sql, seed.net, {
       ...seed.report,
       eligible: false,

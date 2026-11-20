@@ -1,5 +1,7 @@
 /** Small query-conditioned classifier. No network calls or training at inference. */
 export const PRODUCT_NET_VERSION = 2;
+export const PRODUCT_ACCEPT_SCORE = 0.9;
+export const PRODUCT_REJECT_SCORE = 0.1;
 export const PRODUCT_INPUTS = 512;
 export const PRODUCT_HIDDEN = 24;
 export type ProductText = { intent: string; name: string; category: string; description: string };

@@ -10,6 +10,7 @@ on:
       - 'deploy/compose.ci.yaml'
       - 'deploy/compose-smoke.mjs'
       - 'deploy/deny-marktguru.mjs'
+      - 'deploy/legacy-model-fixture.mjs'
       - '.github/workflows/vps-image.yml'
   workflow_dispatch:
 permissions:
@@ -56,6 +57,11 @@ jobs:
           docker compose restart app
           docker compose up -d --wait --wait-timeout 180
           docker compose exec -T app node --experimental-strip-types scripts/product-model.ts status
+      - name: Recheck a legacy report without changing weights
+        run: |
+          legacy_id="$(docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --experimental-strip-types --input-type=module < deploy/legacy-model-fixture.mjs)"
+          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts recheck "$legacy_id" --activate-if-qualified
+          docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e LEGACY_MODEL_ID="$legacy_id" app node --experimental-strip-types --input-type=module < deploy/legacy-model-fixture.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
