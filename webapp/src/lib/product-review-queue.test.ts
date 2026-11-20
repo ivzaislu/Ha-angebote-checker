@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { archiveOffers, type TrainingSource } from "./offer-archive.ts";
+import { archiveOffers, prepareTrainingData, type TrainingSource } from "./offer-archive.ts";
 import { newProductNet, type ProductExample } from "./product-net.ts";
 import type { ProductModelPackage } from "./product-model-store.ts";
 import { readReviewedLabels } from "./product-model-store.ts";
@@ -94,6 +94,28 @@ test("actual deployed conflicts are prioritized without exposing automatic label
   assert.equal(cards[0].reason, "conflict");
   assert.equal("positive" in cards[0], false);
   assert.equal("modelScore" in cards[0], false);
+});
+
+test("obvious category mismatches such as Salat versus face cream are omitted from manual review", () => {
+  const cards = reviewCandidates(
+    [{ ...snapshot, name: "Creme", category: "Gesichtspflege", description: "200-ml-Tiegel" }],
+    new Set(),
+    null,
+    new Set(),
+  );
+  assert.deepEqual(cards, []);
+  const milk = reviewCandidates([snapshot], new Set(), null, new Set());
+  assert.ok(milk.length > 0, "Unknown category must not erase useful negative examples");
+});
+
+test("distant food-category negatives do not crowd the queue", () => {
+  const rows = [
+    { ...snapshot, name: "Champignons", description: "mit Weisswein", category: "Gemüse" },
+  ];
+  assert.ok(prepareTrainingData(rows).some((row) => row.intent === "Rotwein" && !row.positive));
+  assert.ok(
+    reviewCandidates(rows, new Set(), null, new Set()).every((row) => row.intent !== "Rotwein"),
+  );
 });
 
 test("archive answers persist human labels, reject stale overwrites, and enter the next training dataset", async () => {

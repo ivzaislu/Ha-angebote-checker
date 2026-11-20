@@ -52,6 +52,7 @@ const sql = {
     (await pool.query(text, params)).rows as T[],
 };
 const summary = (report: Awaited<ReturnType<typeof trainProductModel>>["report"]) => ({
+  featureVersion:report.featureVersion ?? 2,
   trainCount: report.trainCount,
   validationCount: report.validationCount,
   testCount: report.testCount,

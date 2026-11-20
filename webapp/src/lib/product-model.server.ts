@@ -27,6 +27,7 @@ export async function productModelStatus() {
       ? {
           id: model.id,
           version: model.net.version,
+          featureVersion: model.net.featureVersion ?? 2,
           steps: model.net.steps,
           trainCount: model.report.trainCount,
           validationCount: model.report.validationCount,

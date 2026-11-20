@@ -37,6 +37,46 @@ import {
 } from "./product-model-store.ts";
 import { decideProduct } from "./product-policy.ts";
 import { parseReviewedExamples } from "./product-review.ts";
+import { productCategory, incompatibleCategory } from "./product-category.ts";
+
+test("category groups block explicit cross-department matches while unknown/mixed categories abstain", () => {
+  assert.equal(productCategory("Gesichtspflege").id, "cosmetics");
+  assert.equal(productCategory("Gemüse und Salate").id, "produce");
+  assert.equal(incompatibleCategory("Salat", "Gesichtspflege"), true);
+  assert.equal(incompatibleCategory("Toilettenpapier", "Gesichtspflege"), true);
+  assert.equal(incompatibleCategory("Salat", "Lebensmittel und Kosmetik"), false);
+  assert.equal(incompatibleCategory("Salat", ""), false);
+  assert.equal(incompatibleCategory("Salat", "Sonstiges"), false);
+  assert.equal(incompatibleCategory("Sahne", "Milchprodukte"), false);
+  assert.equal(incompatibleCategory("unknown query", "Gesichtspflege"), false);
+});
+
+test("category feature schema is explicit; legacy features/scores stay unchanged and always-yes nets cannot override exclusions", () => {
+  const net = newProductNet();
+  const row = {
+    intent: "Salat",
+    name: "Creme",
+    category: "Gesichtspflege",
+    description: "200-ml-Tiegel",
+  };
+  const legacyScore = productProbability(net, row);
+  assert.deepEqual(productFeatures(row), productFeatures(row, 2));
+  assert.notDeepEqual(productFeatures(row, 3), productFeatures(row, 2));
+  assert.equal(productProbability(structuredClone(net), row), legacyScore);
+  const enhanced = { ...structuredClone(net), featureVersion: 3 as const };
+  assert.equal(validProductNet(enhanced), true);
+  assert.equal(validProductNet({ ...enhanced, featureVersion: 99 }), false);
+  enhanced.w2.fill(0);
+  enhanced.b2 = 20;
+  const pkg = {
+    id: "always-yes",
+    net: enhanced,
+    report: { eligible: true, supportedIntents: ["Salat"], vocabulary: ["creme"] },
+  } as ProductModelPackage;
+  assert.equal(productProbability(enhanced, row) > 0.99, true);
+  assert.equal(decideProduct(pkg, row).keep, false);
+  assert.equal(decideProduct(pkg, row).fromBrain, false);
+});
 const load = async (name: string) =>
   JSON.parse(await readFile(new URL(`./${name}`, import.meta.url), "utf8"));
 
@@ -53,6 +93,20 @@ test("query-conditioned network learns opposing labels for identical product tex
   assert.equal(validProductNet(net), true);
   assert.equal(validProductNet({ ...net, w1: [NaN] }), false);
   assert.equal(validProductNet({ ...net, version: 1 }), false);
+});
+
+test("category-aware network learns identical names and transfers to an unseen care-category label", () => {
+  const net = newProductNet();
+  net.featureVersion = 3;
+  const food = { intent: "Sahne", name: "Creme", description: "200 ml", category: "Sahne" };
+  const care = { ...food, category: "Gesichtspflege" };
+  for (let i = 0; i < 300; i++) {
+    productTrainingStep(net, productFeatures(food, 3), true, 0.03);
+    productTrainingStep(net, productFeatures(care, 3), false, 0.03);
+  }
+  assert.ok(productProbability(net, food) > 0.9);
+  assert.ok(productProbability(net, care) < 0.1);
+  assert.ok(productProbability(net, { ...care, category: "Körperpflege" }) < 0.1);
 });
 
 test("backpropagation matches numerical gradients", () => {
@@ -123,6 +177,8 @@ test("training is deterministic, never fits the control set and reproduces the b
   const first = trainProductModel(dataset),
     second = trainProductModel(dataset);
   assert.deepEqual(first, second);
+  assert.equal(first.net.featureVersion, 3);
+  assert.equal(first.report.featureVersion, 3);
   const changed = { ...dataset, test: control.map((row) => ({ ...row, positive: !row.positive })) };
   const alternate = trainProductModel(changed);
   assert.deepEqual(first.net, alternate.net);
@@ -239,11 +295,15 @@ test("weak validation labels do not select epochs, while deployed contradictions
   );
   const dataset = prepareProductDataset(authored.curriculum, authored.control);
   const first = trainProductModel(dataset);
+  const accepted = dataset.validation.find(
+    (row) =>
+      row.positive &&
+      decideProduct({ id: "test", ...first }, row).fromBrain &&
+      decideProduct({ id: "test", ...first }, row).keep,
+  );
+  assert.ok(accepted, "Fixture must contradict an actually deployed neural acceptance");
   const weak: ProductExample = {
-    intent: "Milch",
-    name: "Frische Milch",
-    category: "",
-    description: "Bio 1 l",
+    ...accepted,
     positive: false,
     source: "rules",
   };

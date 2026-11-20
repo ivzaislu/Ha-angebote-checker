@@ -98,6 +98,10 @@ export function ProductReviewPanel({
       aria-label="Ручная проверка товаров"
     >
       <h3 className="text-sm font-medium">Помочь нейросети</h3>
+      <p className="text-xs text-muted">
+        Фото помогает вам при проверке. Нейросеть анализирует текст и категории, изображения не
+        анализирует.
+      </p>
       <p className="text-xs text-muted" data-testid="review-count">
         Проверенных примеров в базе: {batch?.reviewedCount ?? reviewedCount}.
       </p>
@@ -134,6 +138,7 @@ export function ProductReviewPanel({
             </p>
           ) : null}
           {card.category ? <p className="text-xs text-muted">Категория: {card.category}</p> : null}
+          <p className="text-xs text-muted">Группа товара: {card.categoryGroup}</p>
           {card.description ? (
             <p className="whitespace-pre-wrap text-sm">{card.description}</p>
           ) : null}
@@ -142,7 +147,7 @@ export function ProductReviewPanel({
               ? "Модель и автоматическое правило расходятся."
               : card.reason === "uncertain"
                 ? "Ответ сети неопределённый."
-                : "Пример для ручной проверки."}
+                : "Учебная пара для проверки; показ карточки не означает совпадение."}
           </p>
           <div className="flex flex-wrap gap-2">
             <button

@@ -686,6 +686,7 @@ export function AngeboteApp() {
                 : "Поиск использует правила. Новая нейросеть включается после отдельного обучения и проверки качества."}
             </p>
             {neural?.active ? <p className="mt-2 text-xs text-muted">
+              Схема признаков: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "с группами товарных категорий" : "текст названия, категории и описания"}.
               В подготовленном наборе: ручных меток {neural.active.sources.human ?? 0}, авторских учебных {neural.active.sources.curated ?? 0}, автоматических {neural.active.sources.rules ?? 0}.
             </p> : null}
             <p className="mt-2 text-xs text-muted">

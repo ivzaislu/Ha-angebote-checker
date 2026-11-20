@@ -7,6 +7,11 @@ import type { ProductModelPackage } from "./product-model-store.ts";
 import { decideProduct } from "./product-policy.ts";
 import { exampleKey, productGroup } from "./product-training.ts";
 import { reviewPresentation, type ReviewPresentationSource } from "./review-presentation.ts";
+import {
+  incompatibleCategory,
+  productCategory,
+  distantReviewCategory,
+} from "./product-category.ts";
 
 type ReviewSnapshot = TrainingSource &
   Partial<Pick<ReviewPresentationSource, "offer_name" | "catalog_name">>;
@@ -25,6 +30,7 @@ export type ReviewCard = {
   otherNames: string[];
   imageUrl: string | null;
   shortName: boolean;
+  categoryGroup: string;
 };
 export function reviewedKey(row: ProductExample) {
   return createHash("sha256").update(exampleKey(row)).digest("hex");
@@ -48,26 +54,32 @@ export function reviewCandidates(
   const weak = prepareTrainingData(snapshots.filter((row) => reviewable(row, controls)));
   const originals = new Map(snapshots.map((row) => [row.snapshot_id, row]));
   const seen = new Set<string>();
-  const candidates = weak
-    .flatMap((row) => {
-      const example: ProductExample = { ...row, source: "rules" };
-      const id = reviewedKey(example);
-      if (reviewed.has(id) || seen.has(id)) return [];
-      seen.add(id);
-      return [{ row, example, id }];
-    })
-    .slice(0, REVIEW_SCORE_LIMIT)
-    .map(({ row, example, id }) => {
-      const decision = decideProduct(model, example);
-      const score = model ? productProbability(model.net, example) : 0.5;
-      const conflict = decision.fromBrain && decision.keep !== row.positive;
-      const uncertain = score > PRODUCT_REJECT_SCORE && score < PRODUCT_ACCEPT_SCORE;
-      const reason: ReviewCard["reason"] = conflict
-        ? "conflict"
-        : uncertain
-          ? "uncertain"
-          : "sample";
-      return {
+  const available = weak.flatMap((row) => {
+    if (incompatibleCategory(row.intent, row.category)) return [];
+    const example: ProductExample = { ...row, source: "rules" };
+    const id = reviewedKey(example);
+    if (reviewed.has(id) || seen.has(id)) return [];
+    seen.add(id);
+    return [
+      {
+        row,
+        example,
+        id,
+        distant: !row.positive && distantReviewCategory(row.intent, row.category),
+      },
+    ];
+  });
+  const near = available.filter((row) => !row.distant).slice(0, REVIEW_SCORE_LIMIT - 100);
+  const far = available.filter((row) => row.distant).slice(0, REVIEW_SCORE_LIMIT - near.length);
+  const candidates = [...near, ...far].flatMap(({ row, example, id, distant }) => {
+    const decision = decideProduct(model, example);
+    const score = model ? productProbability(model.net, example) : 0.5;
+    const conflict = decision.fromBrain && decision.keep !== row.positive;
+    if (distant && !conflict) return [];
+    const uncertain = score > PRODUCT_REJECT_SCORE && score < PRODUCT_ACCEPT_SCORE;
+    const reason: ReviewCard["reason"] = conflict ? "conflict" : uncertain ? "uncertain" : "sample";
+    return [
+      {
         card: {
           id,
           snapshotId: row.provenance.snapshotId,
@@ -76,12 +88,14 @@ export function reviewCandidates(
           category: row.category,
           description: row.description,
           reason,
+          categoryGroup: productCategory(row.category).label,
           ...reviewPresentation(originals.get(row.provenance.snapshotId)!),
         },
         rank: conflict ? 0 : uncertain ? 1 : 2,
         distance: Math.abs(score - 0.5),
-      };
-    });
+      },
+    ];
+  });
   return candidates
     .sort(
       (a, b) => a.rank - b.rank || a.distance - b.distance || a.card.id.localeCompare(b.card.id),

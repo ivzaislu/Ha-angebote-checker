@@ -1,3 +1,4 @@
+import { productCategory, queryDomain, incompatibleCategory } from "./product-category.ts";
 /** Small query-conditioned classifier. No network calls or training at inference. */
 export const PRODUCT_NET_VERSION = 2;
 export const PRODUCT_ACCEPT_SCORE = 0.9;
@@ -11,6 +12,7 @@ export type ProductExample = ProductText & {
 };
 export type ProductNet = {
   version: 2;
+  featureVersion?: 3;
   w1: number[];
   b1: number[];
   w2: number[];
@@ -57,6 +59,7 @@ export function validProductNet(value: unknown): value is ProductNet {
   return Boolean(
     n &&
     n.version === 2 &&
+    (n.featureVersion === undefined || n.featureVersion === 3) &&
     Array.isArray(n.w1) &&
     n.w1.length === PRODUCT_INPUTS * PRODUCT_HIDDEN &&
     Array.isArray(n.w2) &&
@@ -68,7 +71,7 @@ export function validProductNet(value: unknown): value is ProductNet {
   );
 }
 /** Shared train/inference features: words, character fragments and intent×text pairs. */
-export function productFeatures(row: ProductText): number[] {
+export function productFeatures(row: ProductText, featureVersion: 2 | 3 = 2): number[] {
   const intent = normalizedText(row.intent).slice(0, 80);
   const name = normalizedText(row.name).slice(0, 180);
   const category = normalizedText(row.category).slice(0, 180);
@@ -90,6 +93,18 @@ export function productFeatures(row: ProductText): number[] {
   }
   add(intent, 352, 64);
   for (const word of intent.split(" ")) add(`i:${word}`, 352, 64);
+  if (featureVersion === 3) {
+    const group = productCategory(row.category);
+    for (const key of [
+      `category:${group.id}`,
+      `domain:${group.domain}`,
+      `query-domain:${queryDomain(row.intent)}`,
+      `category-relation:${incompatibleCategory(row.intent, row.category) ? "incompatible" : "unresolved-or-compatible"}`,
+    ]) {
+      add(key, 0, 352);
+      add(`${intent}|${key}`, 416, 96);
+    }
+  }
   return [...indices].sort((a, b) => a - b);
 }
 function sigmoid(value: number): number {
@@ -104,7 +119,7 @@ function forward(net: ProductNet, features: number[]) {
   return { probability: sigmoid(score), hidden, activated };
 }
 export function productProbability(net: ProductNet, row: ProductText): number {
-  return forward(net, productFeatures(row)).probability;
+  return forward(net, productFeatures(row, net.featureVersion ?? 2)).probability;
 }
 export function binaryLoss(probability: number, positive: boolean): number {
   const p = Math.max(1e-8, Math.min(1 - 1e-8, probability));

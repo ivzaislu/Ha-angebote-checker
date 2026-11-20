@@ -21,6 +21,7 @@ COPY --from=build /app/src/lib/offer-archive.ts /app/src/lib/product-knowledge.t
 COPY --from=build /app/scripts/product-model.ts ./scripts/product-model.ts
 COPY --from=build /app/scripts/product-training-worker.ts ./scripts/product-training-worker.ts
 COPY --from=build /app/src/lib/product-training-jobs.ts ./src/lib/product-training-jobs.ts
+COPY --from=build /app/src/lib/product-category.ts ./src/lib/product-category.ts
 COPY --from=build /app/src/lib/product-net.ts /app/src/lib/product-policy.ts /app/src/lib/product-metrics.ts /app/src/lib/product-evaluation.ts /app/src/lib/product-data.ts /app/src/lib/product-training.ts /app/src/lib/product-review.ts /app/src/lib/product-model-store.ts /app/src/lib/product-curriculum.json /app/src/lib/product-benchmark.json /app/src/lib/product-seed.json ./src/lib/
 USER node
 EXPOSE 8080

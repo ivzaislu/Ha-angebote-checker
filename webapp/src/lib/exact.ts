@@ -1,3 +1,4 @@
+import { incompatibleCategory } from "./product-category.ts";
 export type ExactQuery = {
   query: string;
   means: string;
@@ -785,6 +786,7 @@ function genericName(name: string, query: string): boolean {
 
 /** True when a handwritten reject fired. The learner must not overrule these. */
 export function hardReject(query: string, productName: string, description: string, category: string): boolean {
+  if (incompatibleCategory(exactQueryFor(query)?.query ?? query,category)) return true;
   const rule = exactQueryFor(query);
   if (!rule) return false;
   return rejected(productName || "", category || "", description || "", rule.reject);
@@ -792,6 +794,7 @@ export function hardReject(query: string, productName: string, description: stri
 
 /** True when the offer is the product that was asked for, not a lookalike. */
 export function offerFits(query: string, productName: string, description: string, category: string): boolean {
+  if (incompatibleCategory(exactQueryFor(query)?.query ?? query,category)) return false;
   const rule = exactQueryFor(query);
   const name = productName || "";
   const cat = category || "";

@@ -10,6 +10,9 @@ try {
   assert.ok(labels.every(row=>row.name==='Frische Milch' && row.description==='Bio 1 l'));
   const [candidate]=(await pool.query('select id,report from product_models order by created_at desc,id desc limit 1')).rows;
   assert.equal(candidate.report.sources.human,2,'Next training must consume the persisted UI labels');
+  assert.equal(candidate.report.featureVersion,3,'New candidates use explicit category-aware features');
+  const [weights]=(await pool.query('select model from product_models where id=$1',[candidate.id])).rows;
+  assert.equal(weights.model.featureVersion,3);
   const [active]=(await pool.query('select model_id from product_model_active where singleton=1')).rows;
   assert.ok(active,'Review/rejected training must preserve an active model');
   if(!candidate.report.eligible) assert.notEqual(active.model_id,candidate.id);

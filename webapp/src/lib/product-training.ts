@@ -94,6 +94,7 @@ export function prepareProductDataset(rows: ProductExample[], test: ProductExamp
   };
 }
 export type TrainingReport = {
+  featureVersion?: 2 | 3;
   schemaVersion: 1 | 2;
   deployment?: DeploymentEvaluation;
   trustedValidation?: Metrics;
@@ -130,7 +131,8 @@ export function trainProductModel(
     throw new Error("Epochs must be 1–100");
   const net = newProductNet(options.seed ?? 173),
     rand = seededRandom(options.seed ?? 173);
-  const prepared = dataset.train.map((row) => ({ row, features: productFeatures(row) }));
+  net.featureVersion = 3;
+  const prepared = dataset.train.map((row) => ({ row, features: productFeatures(row, 3) }));
   const positives = dataset.train.filter((row) => row.positive).length,
     negatives = dataset.train.length - positives;
   if (!positives || !negatives) throw new Error("Both training classes are required");
@@ -220,6 +222,7 @@ export function evaluateTrainedProduct(
   if (!supportedIntents.length) reasons.push("No intent has validated reliable neural decisions");
   return {
     schemaVersion: 2,
+    featureVersion: net.featureVersion ?? 2,
     deployment,
     trustedValidation,
     weakValidation,
