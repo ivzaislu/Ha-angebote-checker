@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ProductReviewPanel } from "./product-review-panel";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CalendarRange,
@@ -721,6 +722,9 @@ export function AngeboteApp() {
               </div>
               {trainingError ? <p role="alert" className="text-sm">{trainingError}</p> : null}
             </div>
+            {training?.configured ? <ProductReviewPanel ownerKey={trainingKey}
+              reviewedCount={neural?.reviewedLabels ?? 0}
+              onReviewed={count=>setNeural(model=>model ? {...model,reviewedLabels:count} : model)} /> : null}
             <p className="mt-2 text-sm text-muted">Названия из ранее накопленного словаря:</p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">

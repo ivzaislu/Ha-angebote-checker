@@ -46,6 +46,45 @@ try {
   await page.getByText('От 1.29 до 1.79 € · наблюдений: 2',{exact:true}).waitFor();
   // Training must be authenticated and keep working after the page is closed.
   await page.getByText('Нейросеть товаров',{exact:true}).click();
+  const loadReview = page.getByRole('button',{name:'Загрузить примеры для проверки',exact:true});
+  await page.locator('#training-key').fill('wrong-key');
+  await loadReview.click();
+  await page.getByRole('alert').waitFor();
+  await page.getByTestId('review-card').waitFor({state:'detached'});
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await loadReview.click();
+  await page.getByTestId('review-card').waitFor();
+  const initialQuery=await page.getByTestId('review-card').locator('p').first().innerText();
+  await page.getByRole('button',{name:'Пропустить',exact:true}).click();
+  await page.getByText('Проверенных примеров в базе: 0.',{exact:true}).waitFor();
+  await loadReview.click(); // Skipped examples remain unreviewed and can reappear.
+  await page.getByText(initialQuery,{exact:true}).waitFor();
+  const reviewCard=page.getByTestId('review-card');
+  const intent=(await reviewCard.locator('p').first().innerText()).replace('Запрос: ','').trim();
+  const correct = intent === 'Milch'; // Isolated fixture is Frische Milch, Bio 1 l.
+  await page.locator('#training-key').fill('wrong-key');
+  await reviewCard.getByRole('button',{name:correct ? 'Подходит' : 'Не подходит',exact:true}).click();
+  await page.getByRole('alert').waitFor();
+  await page.getByText('Проверенных примеров в базе: 0.',{exact:true}).waitFor();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await reviewCard.getByRole('button',{name:correct ? 'Подходит' : 'Не подходит',exact:true}).click();
+  await page.getByText('Проверенных примеров в базе: 1.',{exact:true}).waitFor();
+  const savedText = positive => `Сохранено: «Frische Milch» для «${intent}» — ${positive ? 'подходит' : 'не подходит'}.`;
+  await page.getByRole('button',{name:'Изменить последний ответ',exact:true}).click();
+  await page.getByText(savedText(!correct),{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Изменить последний ответ',exact:true}).click();
+  await page.getByText(savedText(correct),{exact:true}).waitFor();
+  const secondIntent=(await reviewCard.locator('p').first().innerText()).replace('Запрос: ','').trim();
+  assert.notEqual(intent,secondIntent);
+  await reviewCard.getByRole('button',{name:secondIntent==='Milch' ? 'Подходит' : 'Не подходит',exact:true}).click();
+  await page.getByText('Проверенных примеров в базе: 2.',{exact:true}).waitFor();
+  await page.reload();
+  await page.getByText('Нейросеть товаров',{exact:true}).click();
+  await page.getByText('Проверенных примеров в базе: 2.',{exact:true}).waitFor();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await page.getByRole('button',{name:'Загрузить примеры для проверки',exact:true}).click();
+  await page.getByTestId('review-card').waitFor({state:'detached'});
+  await page.getByText(/Порция закончилась/).waitFor();
   await page.locator('#training-key').fill('wrong-key');
   await page.getByRole('button',{name:'Обучить нейросеть',exact:true}).click();
   await page.getByRole('alert').waitFor();
@@ -59,15 +98,17 @@ try {
   await other.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
   await other.getByText('Нейросеть товаров',{exact:true}).click();
   await other.getByTestId('training-status').getByText(/Подготовка обучающих данных|Нейросеть обучается|Проверка и сохранение|Обучение в очереди|Обучение завершено/).first().waitFor();
-  await other.getByTestId('training-status').getByText('Обучение завершено. Модель включена.',{exact:true}).waitFor({timeout:180_000});
+  const terminal = /Обучение завершено\. (Модель включена|Качество не прошло проверку)/;
+  await other.getByTestId('training-status').getByText(terminal).waitFor({timeout:180_000});
   await other.reload();
   await other.getByText('Нейросеть товаров',{exact:true}).click();
-  await other.getByTestId('training-status').getByText('Обучение завершено. Модель включена.',{exact:true}).waitFor();
+  await other.getByTestId('training-status').getByText(terminal).waitFor();
+  await other.getByText('Проверенных примеров в базе: 2.',{exact:true}).waitFor();
   assert.equal(await other.locator('#training-key').inputValue(),'');
   assert.equal(await other.getByRole('button',{name:'Обучить нейросеть',exact:true}).isDisabled(),true);
   await other.close();
   assert.deepEqual(errors,[]);
-  console.log('HTTP browser checks passed: lists, cache search, history, authenticated background training, cross-page status and persisted training result');
+  console.log('HTTP browser checks passed: lists, cache search, history, authenticated review/skip/correction/persistence, background training and cross-page result');
 } finally {
   await browser.close();
 }

@@ -12,6 +12,7 @@ on:
       - 'deploy/deny-marktguru.mjs'
       - 'deploy/legacy-model-fixture.mjs'
       - 'deploy/training-job-smoke.mjs'
+      - 'deploy/review-smoke.mjs'
       - '.github/workflows/vps-image.yml'
   workflow_dispatch:
 permissions:
@@ -77,6 +78,8 @@ jobs:
       - name: Verify interactive UI over ordinary HTTP
         working-directory: webapp
         run: npm run test:browser:http
+      - name: Verify reviewed labels entered the new training candidate
+        run: docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --input-type=module < deploy/review-smoke.mjs
       - name: Container diagnostics
         if: failure()
         run: |

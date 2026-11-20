@@ -22,6 +22,7 @@ export async function productModelStatus() {
     "select count(*)::int as count from product_models",
   );
   return {
+    reviewedLabels: (await sql.query<{count:number}>("select count(*)::int as count from product_review_labels"))[0].count,
     active: model
       ? {
           id: model.id,

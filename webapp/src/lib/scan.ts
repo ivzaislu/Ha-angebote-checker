@@ -109,3 +109,19 @@ export const trainNeuralModel = createServerFn({ method: "POST" })
     const { startTraining } = await import("@/lib/product-training.server");
     return startTraining(data.key);
   });
+
+export const neuralReviewQueue = createServerFn({ method: "POST" })
+  .validator((data:unknown) => z.object({key:z.string().max(512)}).parse(data))
+  .handler(async ({data}) => {
+    const {reviewQueue}=await import("@/lib/product-review.server");
+    return reviewQueue(data.key);
+  });
+
+export const answerNeuralReview = createServerFn({ method: "POST" })
+  .validator((data:unknown) => z.object({key:z.string().max(512),snapshotId:z.string().min(1).max(128),
+    intent:z.string().min(1).max(80),positive:z.boolean(),expectedPositive:z.boolean().optional()}).parse(data))
+  .handler(async ({data}) => {
+    const {answerReview}=await import("@/lib/product-review.server");
+    const {key,...answer}=data;
+    return answerReview(key,answer);
+  });
