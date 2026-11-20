@@ -42,6 +42,8 @@ import { productCategory, incompatibleCategory } from "./product-category.ts";
 test("category groups block explicit cross-department matches while unknown/mixed categories abstain", () => {
   assert.equal(productCategory("Gesichtspflege").id, "cosmetics");
   assert.equal(productCategory("Gemüse und Salate").id, "produce");
+  assert.equal(productCategory("Meeresfrüchte").id,"fish");
+  assert.equal(productCategory("Früchte").id,"produce");
   assert.equal(incompatibleCategory("Salat", "Gesichtspflege"), true);
   assert.equal(incompatibleCategory("Toilettenpapier", "Gesichtspflege"), true);
   assert.equal(incompatibleCategory("Salat", "Lebensmittel und Kosmetik"), false);

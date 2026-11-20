@@ -43,7 +43,7 @@ const groups = [
     id: "produce",
     label: "Овощи и фрукты",
     domain: "food",
-    pattern: /gemuse|obst|fruchte|salat|kartoffel|pilz|champignon/,
+    pattern: /gemuse|obst|(?:^| )fruchte(?: |$)|salat|kartoffel|pilz|champignon/,
   },
   { id: "fish", label: "Рыба и морепродукты", domain: "food", pattern: /fisch|meeresfruchte/ },
   { id: "meat", label: "Мясо", domain: "food", pattern: /fleisch|geflugel|wurst|schinken/ },
