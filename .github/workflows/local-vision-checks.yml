@@ -23,6 +23,19 @@ jobs:
           python-version: '3.10'
       - name: Test downloader, isolation and pixel request
         run: python3 -m unittest discover -s deploy -p test_vision.py -v
+      - name: Validate archive sampler SQL against isolated PostgreSQL
+        run: |
+          docker run -d --name angebote-vision-sample-ci --memory 128m --cpus 1 -e POSTGRES_USER=vision -e POSTGRES_PASSWORD=ci-test-only -e POSTGRES_DB=vision postgres:16-alpine
+          ready=0
+          for attempt in $(seq 1 30); do
+            if docker exec angebote-vision-sample-ci pg_isready -h 127.0.0.1 -U vision -d vision; then ready=1; break; fi
+            sleep 1
+          done
+          test "$ready" = 1
+          VISION_POSTGRES_TEST=1 python3 -m unittest discover -s deploy -p test_vision.py -v
+      - name: Remove isolated sampler database before measuring vision memory
+        if: always()
+        run: docker rm -f angebote-vision-sample-ci || true
       - name: Resolve upstream CPU image to immutable digest
         id: upstream
         run: |
@@ -38,6 +51,8 @@ jobs:
         run: |
           python3 -c 'from deploy.test_vision import png_fixture;from pathlib import Path;Path(".vision/pipeline.png").write_bytes(png_fixture())'
           python3 deploy/vision.py bench --image-file .vision/pipeline.png
+          python3 deploy/vision.py bench --image-file .vision/pipeline.png --task type --repeat 2
+          python3 -c 'import glob,json;rows=[json.load(open(p)) for p in glob.glob(".vision/result-*.json")];typed=sorted([r for r in rows if r["task"]=="type"],key=lambda r:r["pass_index"]);assert len(typed)==2 and [r["pass_index"] for r in typed]==[1,2];assert typed[0]["image_sha256"]==typed[1]["image_sha256"];assert all(not r.get("error") and r["cache_prompt"] is False for r in typed);assert all(r.get("usage",{}).get("prompt_tokens_details",{}).get("cached_tokens")==0 for r in typed)'
           python3 deploy/vision.py status
       - name: Diagnostics
         if: failure()
