@@ -1,8 +1,8 @@
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import type { ArchiveSql } from "./offer-archive.ts";
 
-// The worker holds this session lock throughout training. Recovery uses the same
-// lock inside a single SQL statement, so an alive worker cannot be reclaimed.
+// Coordinator and trainer hold shared session locks. Recovery needs an exclusive
+// transaction lock, so neither living process can be reclaimed as interrupted.
 export const TRAINING_LOCK = 73431025;
 export type TrainingResult = {
   candidate: string;

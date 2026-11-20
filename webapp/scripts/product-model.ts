@@ -24,6 +24,7 @@ import {
 } from "../src/lib/product-model-store.ts";
 import { qualityGate, evaluateProductPolicy } from "../src/lib/product-evaluation.ts";
 import { policyForModel, decideWithProductPolicy } from "../src/lib/product-policy.ts";
+import { TRAINING_LOCK } from "../src/lib/product-training-jobs.ts";
 
 const [command, ...args] = process.argv.slice(2);
 if (
@@ -44,6 +45,8 @@ const authored = authoredDataset(
 );
 const test = authored.control;
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+let trainingLock: pg.PoolClient | undefined;
+let trainingLockLost = false;
 const sql = {
   query: async <T>(text: string, params?: unknown[]): Promise<T[]> =>
     (await pool.query(text, params)).rows as T[],
@@ -73,6 +76,16 @@ const summary = (report: Awaited<ReturnType<typeof trainProductModel>>["report"]
   warning: report.labelWarning,
 });
 try {
+  if (process.env.TRAINING_JOB_ID) {
+    if (command !== "train") throw new Error("A background job must use train");
+    trainingLock = await pool.connect();
+    trainingLock.on("error", () => { trainingLockLost = true; });
+    await trainingLock.query("select pg_advisory_lock_shared($1)", [TRAINING_LOCK]);
+    const job = await trainingLock.query(
+      "select id from product_training_jobs where id=$1 and status='running'", [process.env.TRAINING_JOB_ID],
+    );
+    if (!job.rowCount) throw new Error("Training job is no longer running");
+  }
   const activeId = await activeProductModelId(sql);
   const champion = activeId ? await readProductCandidate(sql, activeId) : null;
   if (command === "status") {
@@ -246,6 +259,14 @@ try {
         champion: champion ?? undefined,
       });
       console.error("PRODUCT_TRAINING_STAGE=checking");
+      if (trainingLock) {
+        // Keep recovery blocked even if only the coordinator process is killed.
+        if (trainingLockLost) throw new Error("Training database ownership lost");
+        const job = await trainingLock.query(
+          "select id from product_training_jobs where id=$1 and status='running'", [process.env.TRAINING_JOB_ID],
+        );
+        if (!job.rowCount || trainingLockLost) throw new Error("Training job was interrupted");
+      }
       const candidate = await saveProductCandidate(sql, net, report);
       let activated = false;
       if (activate && report.eligible) {
@@ -272,5 +293,9 @@ try {
     }
   }
 } finally {
+  if (trainingLock) {
+    await trainingLock.query("select pg_advisory_unlock_shared($1)", [TRAINING_LOCK]).catch(() => {});
+    trainingLock.release();
+  }
   await pool.end();
 }

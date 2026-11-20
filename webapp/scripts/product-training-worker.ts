@@ -18,6 +18,7 @@ const lock = await pool.connect();
 let timer: ReturnType<typeof setInterval> | undefined;
 let child: ReturnType<typeof spawn> | undefined;
 let locked = false;
+let ownsJob = false;
 let stopped = false;
 const stop = () => {
   stopped = true;
@@ -25,8 +26,10 @@ const stop = () => {
 };
 process.once("SIGTERM", stop);
 process.once("SIGINT", stop);
+pool.on("error", stop);
+lock.on("error", stop);
 try {
-  locked = (await lock.query("select pg_try_advisory_lock($1) as locked", [TRAINING_LOCK])).rows[0]
+  locked = (await lock.query("select pg_try_advisory_lock_shared($1) as locked", [TRAINING_LOCK])).rows[0]
     .locked;
   if (!locked) throw new Error("Another training worker holds the lock");
   const started = await sql.query(
@@ -35,6 +38,8 @@ try {
     [id],
   );
   if (!started.length) throw new Error("Training job is no longer queued");
+  ownsJob = true;
+  if (stopped) throw new Error("Training was stopped before launch");
   child = spawn(
     process.execPath,
     [
@@ -46,7 +51,7 @@ try {
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: { ...process.env, TRAINING_JOB_ID: id },
     },
   );
   let output = "",
@@ -64,7 +69,6 @@ try {
     const stages = [...stderr.matchAll(/PRODUCT_TRAINING_STAGE=(preparing|training|checking)/g)];
     if (stages.length) stage = stages.at(-1)![1];
   });
-  lock.on("error", stop); // Never let training outlive its database ownership.
   timer = setInterval(() => {
     void lock
       .query("select 1")
@@ -103,11 +107,11 @@ try {
   child?.kill("SIGKILL");
   // Detailed diagnostics stay inside the container, never in public job status.
   console.error("Training job failed", id, error);
-  await failTrainingJob(sql, id);
+  if (ownsJob) await failTrainingJob(sql, id);
   process.exitCode = 1;
 } finally {
   if (timer) clearInterval(timer);
-  if (locked) await lock.query("select pg_advisory_unlock($1)", [TRAINING_LOCK]).catch(() => {});
+  if (locked) await lock.query("select pg_advisory_unlock_shared($1)", [TRAINING_LOCK]).catch(() => {});
   lock.release();
   await pool.end();
 }
