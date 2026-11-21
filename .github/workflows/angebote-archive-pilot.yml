@@ -1,0 +1,102 @@
+name: Angebote archive pilot
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [pilot, collect]
+        default: pilot
+        description: 'pilot: festgelegte Quellen und Annotationen; collect: neue unbewertete Seiten'
+      archive_url:
+        type: string
+        default: https://angebote.com/lidl/archives
+        description: Archivübersicht für collect
+      max_pages:
+        type: choice
+        options: ['1', '2', '3', '4', '5', '6']
+        default: '2'
+        description: Maximale Seitenzahl für collect
+  push:
+    branches: [feature/self-learning-product-catalog]
+    paths:
+      - '.github/workflows/angebote-archive-pilot.yml'
+      - 'tools/angebote_archive.py'
+      - 'tools/test_angebote_archive.py'
+      - 'training/angebote/**'
+      - 'webapp/scripts/train-archive-pilot.ts'
+      - 'webapp/src/lib/archive-lessons*'
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PILOT_MODE: ${{ inputs.mode || 'pilot' }}
+      ARCHIVE_URL: ${{ inputs.archive_url || 'https://angebote.com/lidl/archives' }}
+      MAX_PAGES: ${{ inputs.max_pages || '2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test bounded extraction and failure reporting
+        run: PYTHONPATH=tools python -m unittest tools/test_angebote_archive.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - name: Install training dependencies
+        working-directory: webapp
+        run: npm install --no-save --package-lock=false --no-audit --no-fund
+      - name: Test evidence validation and held-out isolation
+        working-directory: webapp
+        run: node --experimental-strip-types --test src/lib/archive-lessons.test.ts
+      - name: Collect historical OCR pages and source images
+        run: |
+          if [ "$PILOT_MODE" = pilot ]; then
+            python tools/angebote_archive.py --manifest training/angebote/pilot-sources.json --out .angebote-pilot/run
+          else
+            python tools/angebote_archive.py --archive-url "$ARCHIVE_URL" --max-pages "$MAX_PAGES" --out .angebote-pilot/run
+          fi
+      - name: Train isolated candidate and measure held-out offers
+        if: env.PILOT_MODE == 'pilot'
+        run: |
+          node --max-old-space-size=256 --experimental-strip-types webapp/scripts/train-archive-pilot.ts \
+            .angebote-pilot/run/pages.jsonl training/angebote/pilot-annotations.jsonl .angebote-pilot/model
+          cp training/angebote/pilot-annotations.jsonl .angebote-pilot/run/annotations.jsonl
+      - name: Record outcome
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Archiv-Pilot\n\n')
+              report = Path('.angebote-pilot/run/report.json')
+              if report.exists():
+                  out.write('Sammlerbericht:\n\n```json\n'+report.read_text()+'\n```\n\n')
+              evaluation = Path('.angebote-pilot/model/evaluation.json')
+              if evaluation.exists():
+                  r = json.loads(evaluation.read_text())
+                  out.write(f"Produkte: {r['products']}; Trainings-/Validierungspaare: {r['archiveTrainExamples']}; zurückgehalten: {r['archiveHoldoutExamples']}.\n\n")
+                  out.write(f"Gewichte aktualisiert: {r['candidate']['learning']['weightsUpdated']}.\n\n")
+                  for name in ['baseline', 'candidate']:
+                      m = r['archiveHoldout'][name]['all']
+                      out.write(f"{name}: {m['tp']+m['tn']}/{m['count']} zurückgehaltene Paare korrekt.\n\n")
+              elif os.environ['PILOT_MODE'] == 'pilot':
+                  out.write('Kein abgeschlossenes Trainingsergebnis vorhanden. Fehler im Laufprotokoll prüfen.\n\n')
+              out.write('Quellen und Annotationen prüfen. Ein erfolgreicher Workflow ist kein Nachweis besserer Produktgenauigkeit. Keine Produktionsaktivierung.\n')
+          PY
+      - name: Upload source evidence, annotations, models and evaluation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: angebote-archive-pilot-${{ github.run_id }}
+          path: |
+            .angebote-pilot/run/
+            .angebote-pilot/model/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
