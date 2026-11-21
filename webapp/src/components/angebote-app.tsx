@@ -1,3 +1,4 @@
+import { TrainingLearningDetails } from "./training-learning-details";
 import { formatDate, formatNumber, trainingReason, displayError } from "@/lib/locale";
 import { useEffect, useState } from "react";
 import { ProductReviewPanel } from "./product-review-panel";
@@ -719,6 +720,7 @@ export function AngeboteApp() {
                     Version {training.job.result.candidate}. Trainingsbeispiele: {training.job.result.trainCount}; Validierungsbeispiele: {training.job.result.validationCount}; Kontrollbeispiele: {training.job.result.testCount}.
                     {training.job.result.deployedControlAccuracy !== null ? ` Ergebnis auf dem redaktionellen Kontrollsatz: ${formatNumber(training.job.result.deployedControlAccuracy * 100)}%.` : ""}
                   </p> : null}
+                  <TrainingLearningDetails learning={training.job.result?.learning} />
                   {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{trainingReason(reason)}</p>)}
                 </> : null}
               </div>

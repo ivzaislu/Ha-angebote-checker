@@ -1,3 +1,6 @@
+import curriculum from "./product-curriculum.json";
+import { authoredDataset } from "./product-data.ts";
+import { inspectControlFailures } from "./product-control-diagnostics.ts";
 import { getSql } from "@/lib/db";
 import controls from "./product-benchmark.json";
 import { productGroup } from "./product-training.ts";
@@ -43,6 +46,9 @@ export async function reviewQueue(key: string, mode: "active" | "rejected" = "ac
       id: model?.id ?? null,
       featureVersion: model?.net.featureVersion ?? 2,
       reasons: mode === "rejected" ? (model?.report.reasons ?? []) : [],
+      learning: model?.report.learning ?? null,
+      controlDiagnostics: mode === "rejected" && model
+        ? inspectControlFailures(model, authoredDataset(curriculum, controls).control) : null,
     },
   };
 }

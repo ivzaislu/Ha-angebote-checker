@@ -1,3 +1,4 @@
+import type { TrainingLearning } from "./product-training.ts";
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import type { ArchiveSql } from "./offer-archive.ts";
 
@@ -5,6 +6,7 @@ import type { ArchiveSql } from "./offer-archive.ts";
 // transaction lock, so neither living process can be reclaimed as interrupted.
 export const TRAINING_LOCK = 73431025;
 export type TrainingResult = {
+  learning?: TrainingLearning;
   candidate: string;
   activated: boolean;
   trainCount: number;
@@ -87,7 +89,22 @@ export function parseTrainingResult(output: string): TrainingResult {
   ) {
     throw new Error("Invalid training result");
   }
+  let learning: TrainingLearning | undefined;
+  if (value.learning != null) {
+    const n = value.learning;
+    if (!n || !["warm-start", "from-scratch"].includes(n.mode) ||
+        !(n.parentId === null || typeof n.parentId === "string" && n.parentId.length <= 128) ||
+        !(Number.isFinite(n.rate) && n.rate > 0 && n.rate <= 1) ||
+        ![n.initialValidationLoss,n.bestValidationLoss].every(v => Number.isFinite(v) && v >= 0) ||
+        typeof n.weightsUpdated !== "boolean" ||
+        (n.mode === "warm-start" ? !n.parentId : n.parentId !== null))
+      throw new Error("Invalid training learning metadata");
+    learning = {mode:n.mode,parentId:n.parentId,rate:n.rate,
+      initialValidationLoss:n.initialValidationLoss,bestValidationLoss:n.bestValidationLoss,
+      weightsUpdated:n.weightsUpdated};
+  }
   return {
+    ...(learning ? {learning} : {}),
     candidate: value.candidate,
     activated: value.activated,
     trainCount: value.trainCount,

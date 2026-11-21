@@ -165,3 +165,26 @@ docker compose exec -T app node --experimental-strip-types scripts/product-model
 При первом внедрении v2 старые веса `offer_brain` остаются в базе для совместимости словаря. Новая сеть обучается отдельно и не изменяется обычными запросами. Сбор листовок может поддерживать старый словарь, но не заменяет активную v2-модель. Обучение доступно через CLI и кнопку с ключом владельца; анонимные посетители видят только состояние. Прямые переключения и откат версий остаются операторскими командами.
 
 Проверка учебного обучения без базы: из `webapp` выполните `npm run brain:seed`. Она выведет отчёт, не изменяя файлы или рабочую модель. Переобучение учебного файла разработчиком — `node --experimental-strip-types scripts/train-product-model.ts --write-seed`.
+
+
+## Weitertraining und Ablehnungsdiagnose
+
+Bei einer aktiven, qualifizierten Version mit Merkmalsschema 3 startet das nächste Training
+mit einer Kopie ihrer Gewichte. Der anfängliche Lernschritt beträgt 0,005 statt 0,03 beim
+Neuaufbau. Bestehende Gewichte mit dem alten Merkmalsschema werden nicht umgedeutet;
+dann wird ein neues Netz aufgebaut. Die Trainingsdaten enthalten weiterhin die bisherigen
+redaktionellen Beispiele, Archivdaten und geprüften Bewertungen, um frühere Aufgaben
+beim Weitertraining zu wiederholen.
+
+Nur die geprüfte Validierung wählt den Trainingsstand. Auch der Ausgangsstand vor dem
+ersten Schritt darf gewinnen. Der Bericht nennt unter `learning` die Ausgangsversion,
+Lernrate, Validierungsverluste und ob die ausgewählten Gewichte aktualisiert wurden.
+Ein unveränderter Stand ist kein nachgewiesener Lernfortschritt. Neue Gewichte können
+weiterhin am Kontrollsatz scheitern; die Freigabeschwellen bleiben unverändert.
+
+„Letzte Ablehnung prüfen“ zeigt außerdem bis zu 20 konkrete Kontrollfehler mit Suchanfrage,
+Produkt, Kategorie, Beschreibung und erwarteter/tatsächlicher Entscheidung. Diese Diagnose
+wird aus den unveränderten Kandidatengewichten rekonstruiert und funktioniert auch für
+bereits gespeicherte Berichte, wenn der Fingerabdruck des Kontrollsatzes übereinstimmt.
+Kontrollbeispiele sind schreibgeschützt, bleiben aus der manuellen Trainingswarteschlange
+ausgeschlossen und werden nicht als neue Trainingsbeispiele übernommen.

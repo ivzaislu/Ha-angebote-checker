@@ -434,3 +434,43 @@ test("candidate registry preserves versions, refuses failed activation, detects 
     await db.close();
   }
 });
+
+test("compatible active weights are copied for continued learning; control labels never choose the checkpoint", () => {
+  const yes: ProductExample = { intent:"Milch", name:"Bio Vollmilch", category:"Milch", description:"1 l", positive:true, source:"human" };
+  const no: ProductExample = { ...yes, name:"Feinwaschmittel", category:"Waschmittel", positive:false };
+  const dataset = { train:[yes,no], validation:[yes,no], test:[{...yes,name:"Kontrollmilch"},{...no,name:"Kontrollwaschmittel"}], fingerprint:"test", conflicts:0, sources:{human:4} };
+  const net = newProductNet(99); net.featureVersion = 3;
+  const parent: ProductModelPackage = { id:"active-fixture", net, report:{...evaluateTrainedProduct(net,dataset,{epochs:0,bestEpoch:0}),eligible:true} };
+  const original = JSON.stringify(parent);
+  const next = trainProductModel(dataset,{champion:parent});
+  assert.equal(next.report.learning?.mode,"warm-start");
+  assert.equal(next.report.learning?.parentId,parent.id);
+  assert.equal(next.report.learning?.rate,0.005);
+  assert.ok(next.report.learning!.bestValidationLoss < next.report.learning!.initialValidationLoss);
+  assert.equal(next.report.learning?.weightsUpdated,true);
+  assert.ok(next.net.steps > parent.net.steps);
+  assert.equal(JSON.stringify(parent),original,"Active weights/report must never be mutated");
+  const flipped = trainProductModel({...dataset,test:dataset.test.map(row=>({...row,positive:!row.positive}))},{champion:parent});
+  assert.deepEqual(flipped.net,next.net,"Held-out control labels cannot affect weights or epoch selection");
+  assert.equal(flipped.report.bestEpoch,next.report.bestEpoch);
+});
+
+test("continued learning retains epoch zero when new training would degrade trusted validation", () => {
+  const yes: ProductExample = {intent:"Milch",name:"Bio Vollmilch",category:"Milch",description:"1 l",positive:true,source:"human"};
+  const no: ProductExample = {...yes,name:"Feinwaschmittel",category:"Waschmittel",positive:false};
+  const net = newProductNet(); net.featureVersion=3;
+  for(let i=0;i<300;i++) for(const row of [yes,no]) productTrainingStep(net,productFeatures(row,3),row.positive,0.03);
+  const dataset={train:[{...yes,positive:false},{...no,positive:true}],validation:[yes,no],test:[yes,no],fingerprint:"contradiction",conflicts:0,sources:{human:4}};
+  const parent: ProductModelPackage={id:"active-fixture",net,report:{...evaluateTrainedProduct(net,dataset,{epochs:0,bestEpoch:0}),eligible:true}};
+  const next=trainProductModel(dataset,{champion:parent});
+  assert.equal(next.report.bestEpoch,0);
+  assert.equal(next.report.learning?.weightsUpdated,false);
+  assert.deepEqual(next.net,net);
+  for(const incompatible of [{...parent,net:{...net,featureVersion:undefined}},{...parent,report:{...parent.report,eligible:false}}]) {
+    const result=trainProductModel(dataset,{champion:incompatible,epochs:1});
+    assert.equal(result.report.learning?.mode,"from-scratch");
+    assert.equal(result.report.learning?.parentId,null);
+    assert.equal(result.report.learning?.rate,0.03);
+  }
+  assert.throws(()=>trainProductModel(dataset,{rate:NaN}),/Learning rate/);
+});

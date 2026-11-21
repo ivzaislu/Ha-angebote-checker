@@ -1,3 +1,4 @@
+import { TrainingLearningDetails } from "./training-learning-details";
 import { trainingReason, displayError } from "@/lib/locale";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -154,6 +155,23 @@ export function ProductReviewPanel({
                   Nicht zur Bewertung verfügbar: {batch.unavailableConflicts} (kein passender Archiveintrag oder Beispiel ausgeschlossen).
                 </p>
               ) : null}
+              <TrainingLearningDetails learning={batch.reviewModel.learning} />
+              {batch.reviewModel.controlDiagnostics ? <div data-testid="control-diagnostics" className="space-y-2">
+                <h4 className="font-medium">Fehler auf dem Kontrollsatz</h4>
+                <p>Nur zur Diagnose. Kontrollbeispiele können hier nicht bewertet werden und fließen nicht in das Training ein.</p>
+                {!batch.reviewModel.controlDiagnostics.available
+                  ? <p>Der Kontrollsatz hat sich geändert. Die Fehler dieses Berichts können nicht zuverlässig rekonstruiert werden.</p>
+                  : <>
+                    <p>Fehler insgesamt: {batch.reviewModel.controlDiagnostics.total}.</p>
+                    {batch.reviewModel.controlDiagnostics.errors.map((row, index) => <div key={index} className="border border-line p-2">
+                      <p>Suchanfrage: {row.intent} · Produkt: {row.name}</p>
+                      <p>Kategorie: {row.category} · {row.description}</p>
+                      <p>Erwartet: {row.expected ? "passt" : "passt nicht"}; Kandidat: {row.actual ? "passt" : "passt nicht"}.
+                        {" "}{row.fromBrain ? "Neuronale Entscheidung." : "Entscheidung durch Regeln oder Rückfall auf Regeln."}</p>
+                    </div>)}
+                    {batch.reviewModel.controlDiagnostics.truncated ? <p>Die ersten 20 Fehler werden angezeigt.</p> : null}
+                  </>}
+              </div> : null}
               {batch.reviewModel.reasons.map((reason) => (
                 <p key={reason}>{trainingReason(reason)}</p>
               ))}

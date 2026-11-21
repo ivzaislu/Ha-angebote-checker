@@ -77,6 +77,10 @@ test("public training summary validates output and discards process details", ()
     parseTrainingResult(JSON.stringify({ ...result, secret: "database password" })),
     result,
   );
+  const learning = {mode:"warm-start",parentId:"active-test",rate:0.005,initialValidationLoss:0.5,bestValidationLoss:0.4,weightsUpdated:true};
+  assert.deepEqual(parseTrainingResult(JSON.stringify({...result,learning:{...learning,secret:"private"}})), {...result,learning});
+  assert.throws(()=>parseTrainingResult(JSON.stringify({...result,learning:{...learning,rate:0}})));
+  assert.throws(()=>parseTrainingResult(JSON.stringify({...result,learning:{...learning,parentId:null}})));
   assert.throws(() => parseTrainingResult("error: private diagnostics"));
   assert.throws(() => parseTrainingResult(JSON.stringify({ ...result, activated: "true" })));
   assert.throws(() => parseTrainingResult(JSON.stringify({ ...result, trainCount: -1 })));

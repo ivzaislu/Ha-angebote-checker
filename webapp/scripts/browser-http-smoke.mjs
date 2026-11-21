@@ -123,6 +123,7 @@ try {
     const candidate=(await other.getByTestId('training-status').innerText()).match(/product-v2-[a-f0-9]+/)[0];
     await other.getByTestId('active-text-model').filter({hasText:candidate}).waitFor();
   }
+  await other.getByTestId('training-learning').filter({hasText:/Weitertraining auf Basis/}).waitFor();
   await other.reload();
   await other.getByText('Neuronales Produktnetz',{exact:true}).click();
   await other.getByTestId('training-status').getByText(terminal).waitFor();

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   newProductNet,
+  validProductNet,
   normalizedText,
   hashText,
   seededRandom,
@@ -93,7 +94,16 @@ export function prepareProductDataset(rows: ProductExample[], test: ProductExamp
       .digest("hex"),
   };
 }
+export type TrainingLearning = {
+  mode: "warm-start" | "from-scratch";
+  parentId: string | null;
+  rate: number;
+  initialValidationLoss: number;
+  bestValidationLoss: number;
+  weightsUpdated: boolean;
+};
 export type TrainingReport = {
+  learning?: TrainingLearning;
   featureVersion?: 2 | 3;
   schemaVersion: 1 | 2;
   deployment?: DeploymentEvaluation;
@@ -129,15 +139,22 @@ export function trainProductModel(
   const epochs = options.epochs ?? 40;
   if (!Number.isInteger(epochs) || epochs < 1 || epochs > 100)
     throw new Error("Epochs must be 1–100");
-  const net = newProductNet(options.seed ?? 173),
-    rand = seededRandom(options.seed ?? 173);
+  // Copy only compatible, qualified weights. Never reinterpret legacy features.
+  const parent = options.champion;
+  const warmStart = Boolean(parent?.report.eligible && validProductNet(parent.net) && parent.net.featureVersion === 3);
+  const net = warmStart ? structuredClone(parent!.net) : newProductNet(options.seed ?? 173);
+  const rand = seededRandom(options.seed ?? 173);
   net.featureVersion = 3;
+  const initialRate = options.rate ?? (warmStart ? 0.005 : 0.03);
+  if (!Number.isFinite(initialRate) || initialRate <= 0 || initialRate > 1)
+    throw new Error("Learning rate must be greater than 0 and at most 1");
+  const initialValidationLoss = classificationMetrics(trustedValidation, row => productProbability(net, row)).loss!;
   const prepared = dataset.train.map((row) => ({ row, features: productFeatures(row, 3) }));
   const positives = dataset.train.filter((row) => row.positive).length,
     negatives = dataset.train.length - positives;
   if (!positives || !negatives) throw new Error("Both training classes are required");
   let best = structuredClone(net),
-    bestLoss = Infinity,
+    bestLoss = warmStart ? initialValidationLoss : Infinity,
     bestEpoch = 0,
     stale = 0,
     ran = 0;
@@ -146,7 +163,7 @@ export function trainProductModel(
       const j = Math.floor(rand() * (i + 1));
       [prepared[i], prepared[j]] = [prepared[j], prepared[i]];
     }
-    const rate = (options.rate ?? 0.03) * 0.96 ** (epoch - 1);
+    const rate = initialRate * 0.96 ** (epoch - 1);
     for (const { row, features } of prepared) {
       const classWeight = Math.min(
         5,
@@ -172,7 +189,18 @@ export function trainProductModel(
   }
   return {
     net: best,
-    report: evaluateTrainedProduct(best, dataset, { epochs: ran, bestEpoch }, options.champion),
+    report: {
+      ...evaluateTrainedProduct(best, dataset, { epochs: ran, bestEpoch }, options.champion),
+      learning: {
+        mode: warmStart ? "warm-start" : "from-scratch",
+        parentId: warmStart ? parent!.id : null,
+        rate: initialRate,
+        initialValidationLoss,
+        bestValidationLoss: bestLoss,
+        // Epoch zero can win on trusted validation. Do not call that an improvement.
+        weightsUpdated: bestEpoch > 0,
+      },
+    },
   };
 }
 

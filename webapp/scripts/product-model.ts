@@ -53,6 +53,7 @@ const sql = {
 };
 const summary = (report: Awaited<ReturnType<typeof trainProductModel>>["report"]) => ({
   featureVersion:report.featureVersion ?? 2,
+  learning: report.learning ?? null,
   trainCount: report.trainCount,
   validationCount: report.validationCount,
   testCount: report.testCount,
@@ -204,6 +205,7 @@ try {
         { epochs: original.report.epochs, bestEpoch: original.report.bestEpoch },
         champion ?? undefined,
       );
+      if (original.report.learning) report.learning = structuredClone(original.report.learning);
       const candidate = await saveProductCandidate(sql, original.net, report);
       let activated = false;
       if (args[1] && report.eligible) {

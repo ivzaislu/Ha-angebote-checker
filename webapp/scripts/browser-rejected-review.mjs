@@ -18,6 +18,9 @@ try {
   await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
   await page.getByRole('button',{name:'Letzte Ablehnung prüfen',exact:true}).click();
   await page.getByTestId('review-target').getByText(/Prüfung des abgelehnten Kandidaten/).waitFor();
+  await page.getByTestId('control-diagnostics').getByText('Fehler auf dem Kontrollsatz',{exact:true}).waitFor();
+  await page.getByTestId('control-diagnostics').getByText(/Erwartet: passt; Kandidat: passt nicht/).first().waitFor();
+  assert.equal(await page.getByTestId('control-diagnostics').getByRole('button').count(),0,'Control examples are read-only');
   await page.getByText(/Konflikt aus dem gespeicherten Kandidatenbericht/).waitFor();
   await page.getByText('Produkt: Tafeläpfel XXL',{exact:true}).waitFor();
   assert.equal((await page.getByTestId('active-text-model').innerText()).match(/product-v2-[a-f0-9]+/)[0],active);
