@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseArchiveScope, prepareArchiveExperiment } from "./archive-experiment.ts";
+import { parseArchiveScope, prepareArchiveExperiment, preparePreviousArchiveDataset, archiveReleaseGate } from "./archive-experiment.ts";
 import { newProductNet, type ProductExample } from "./product-net.ts";
 import { trainProductModel, evaluateTrainedProduct } from "./product-training.ts";
 import type { ProductModelPackage } from "./product-model-store.ts";
@@ -32,4 +32,22 @@ test("offline pretraining initialization is independent of the reference release
  assert.equal(first.report.learning?.mode,"warm-start");assert.deepEqual(first.net,second.net);
  assert.equal(first.report.bestEpoch,second.report.bestEpoch);
  assert.throws(()=>trainProductModel(data,{initialization:{id:"legacy",net:{...net,featureVersion:undefined}}}),/feature-schema-3/);
+});
+
+test("previous archive replay cannot recycle earlier holdouts or silently alter their answers",()=>{
+ const scope=parseArchiveScope(JSON.stringify(source));
+ const held=row("Schon gemessener Fisch"),lesson=row("Frühere Archivlektion");
+ const base={curriculum:[row("Grundwissen")],control:[row("Alte Kontrolle")]};
+ const previous={train:[lesson],holdout:[held]};
+ const current={train:[lesson,row("Neue Lektion")],holdout:[held]};
+ const d=preparePreviousArchiveDataset(base,current,previous,scope);
+ assert.ok([...d.train,...d.validation].every(r=>r.name!==held.name&&r.name!=="Neue Lektion"));
+ assert.throws(()=>preparePreviousArchiveDataset(base,{...current,holdout:[{...held,positive:false}]},previous,scope),/Prüfantworten/);
+ assert.throws(()=>preparePreviousArchiveDataset(base,{...current,train:[]},previous,scope),/unveränderter Teil/);
+});
+
+test("final archive gate blocks a regression in one brochure even when other stores improve",()=>{
+ const result=archiveReleaseGate({old:{reference:{fp:0,fn:3,count:56},candidate:{fp:0,fn:4,count:56}},new:{reference:{fp:0,fn:3,count:26},candidate:{fp:0,fn:0,count:26}}});
+ assert.equal(result.passed,false);assert.match(result.reasons[0],/old: Mehr übersehene/);
+ assert.equal(archiveReleaseGate({same:{reference:{fp:0,fn:1,count:5},candidate:{fp:0,fn:1,count:5}}}).passed,true);
 });

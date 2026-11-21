@@ -55,7 +55,7 @@ aktive VPS-Modell. Das Artefakt wird nicht automatisch importiert oder aktiviert
 Wenn der Ausgangsstand auf der geprüften Validierung gewinnt, wird dies ausdrücklich
 als `weightsUpdated: false` ausgewiesen; ein neuer Dateiname ist kein Lernerfolg.
 
-## Erweiterte Partie (Standard im Workflow)
+## Frühere erweiterte Partie
 
 `expanded-sources.json` und `expanded-annotations.jsonl` erweitern den Versuch auf
 **189 unterschiedliche Produktnamen, 25 Seiten und fünf abgeschlossene Prospekte**
@@ -87,8 +87,8 @@ node --experimental-strip-types webapp/scripts/train-archive-pilot.ts \
   .angebote-pilot/expanded-model training/angebote/expanded-scope.json
 ```
 
-Ein explizites Manifest darf jetzt höchstens 32 Seiten enthalten; der entdeckende
-Sammelmodus bleibt auf sechs Seiten beschränkt. Der Workflow erlaubt 20 Minuten,
+Ein explizites Manifest darf jetzt höchstens 48 Seiten enthalten; der entdeckende
+Sammelmodus bleibt auf sechs Seiten beschränkt. Der Workflow erlaubt 30 Minuten,
 lädt weiterhin seriell mit Verzögerung und bricht bei Netzwerk-/Belegfehlern ab.
 Im Workflow kann `dataset: pilot` den ursprünglichen kleinen Versuch reproduzieren.
 
@@ -107,3 +107,56 @@ Gewichte aktualisiert. Die Freigabe scheiterte dennoch an einem zusätzlichen fa
 Treffer auf dem Kontrollsatz (Wurst bei rohem Schweinefilet). Das ist kein Produktionsrelease; die bestehende VPS-Version
 wird nicht ersetzt. Die Ergebnisse sind kleine, assistentenkuratierte Stichproben und
 keine unabhängige Genauigkeitsgarantie.
+
+
+## Mehrere Geschäfte (Standard im Workflow)
+
+`multistore-sources.json` und `multistore-annotations.jsonl` enthalten 291 unterschiedliche
+Produkte auf 46 belegten Seiten aus 12 Handelsketten: Netto, Edeka, Lidl, Norma, NKD,
+Aldi (Nord und Süd zusammengefasst), Rewe, Kaufland, Penny, dm, Rossmann und Müller.
+Alle 189 Produkte der vorherigen Partie bleiben erhalten. Die neuen Annotationen wurden
+anhand der Originalbilder geprüft; sie bleiben `assistant-curated`, keine menschlichen Labels.
+
+- Trainings-/Validierungspool: 216 Produkte, 290 Paare (53 positive, 237 negative).
+- Zurückgehaltene ganze Prospekte: 75 Produkte, 99 Paare (17 positive, 82 negative).
+- Norma erhält getrennte Lern- und Prüfprosપekte; NKD ebenfalls. Die vier NKD-Prüffälle
+  sind Kleidung und ausschließlich negative Antworten auf Lebensmittelanfragen. Sie
+  messen weder allgemeine NKD-Erkennung noch die Fähigkeit, Kleidung zu klassifizieren.
+- Bei Edeka, Aldi, Rewe, Kaufland, Penny, dm, Rossmann und Müller liegen nur Lernfälle
+  vor; dafür wird keine Genauigkeit auf unabhängigen Archivfällen ausgewiesen.
+
+`multistore-coverage.json` dokumentiert die Anbieterabdeckung aller 17 deutschen
+Geschäfte im App-Filter. Die geprüften Angebote.com-Archivübersichten für Globus,
+tegut, HIT, Combi und famila lieferten HTTP 404. Das beschreibt diese Anbieterpfade,
+nicht die Existenz der Geschäfte oder deren Verfügbarkeit bei Marktguru. Der App-Filter
+enthält jetzt auch NKD; Norma war bereits vorhanden. Filtereinträge garantieren keine
+regional verfügbaren Angebote.
+
+```bash
+python3 tools/angebote_archive.py --manifest training/angebote/multistore-sources.json --out .angebote-pilot/multistore-run
+node --experimental-strip-types webapp/scripts/train-archive-pilot.ts \
+  .angebote-pilot/multistore-run/pages.jsonl training/angebote/multistore-annotations.jsonl \
+  .angebote-pilot/multistore-model training/angebote/expanded-scope.json \
+  training/angebote/expanded-annotations.jsonl
+```
+
+Der optionale letzte Parameter reproduziert den festgelegten vorherigen Archivstand.
+Dessen unveränderte Trainingsantworten müssen weiterhin in der neuen Partie enthalten
+sein; alle früheren Prüfantworten bleiben zurückgehalten. Weitertraining startet aus
+diesen Gewichten. Die redaktionellen Freigabeschwellen vergleichen weiterhin mit der
+ursprünglichen isolierten Referenz, nicht mit einer zuvor abgelehnten Archivversion.
+
+Zusätzlich prüft `archiveReleaseGate` jede zurückgehaltene Ausgabe gegen den vorherigen
+Archivstand: weder falsche noch übersehene Treffer dürfen zunehmen. Diese Prüfung erfolgt
+erst nach abgeschlossener Gewichtsauswahl; Archivantworten wählen keine Epochen oder
+Schwellen. `experimentQualified` verlangt beide Prüfungen. Ein erfolgreicher Workflow
+bedeutet nur, dass Sammlung und Auswertung erfolgreich ausgeführt wurden.
+
+Lokale Messung: Norma 26/26, NKD 4/4 (nur negative Kleidungsfälle), Lidl unverändert
+12/13; Netto 52/56 gegenüber zuvor 53/56. Insgesamt 94/99 gegenüber 95/99. Der
+redaktionelle Kontrollsatz wurde bestanden, die zusätzliche Archivprüfung jedoch
+**nicht**. Der Kandidat wird daher nicht als Ersatzmodell empfohlen und nicht aktiviert.
+Der frühere falsche Wurst-Treffer bei rohem Schweinefilet ist behoben; das rechtfertigt
+keine Verschlechterung im Netto-Archiv. Weitere Lernfälle müssen getrennt von diesen
+Prüfantworten gesammelt werden. VPS-Gewichte und dortige Nutzerbewertungen bleiben
+von diesem Offline-Versuch unberührt.

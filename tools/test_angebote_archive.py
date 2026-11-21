@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import urllib.error
-from angebote_archive import source_url, page_metadata, parse_page, discover, collect, SameSiteRedirect
+from angebote_archive import source_url, page_metadata, parse_page, discover, collect, SameSiteRedirect, MAX_MANIFEST_PAGES
 
 URL='https://angebote.com/lidl/woche-39-ab-21-09-2026-bis-26-09-2026-seite-1-aoozd'
 HTML='''<html><h1>Lidl Prospekt Seite 1</h1><img src="https://vm-folders.ams3.digitaloceanspaces.com/folders/41620/pages/full-1.jpg"><p>Navigation Milch</p><!-- OCR --><h2>Andere Inhalte</h2><small><b>Warnung</b><p>BÄRENMARKE Haltbare Milch<br>3,5 % Fett &amp; 1 l</p>Seitentitel</small><script>track()</script><p>Werbung Kaffee</p></html>'''
@@ -27,6 +27,11 @@ class Tests(unittest.TestCase):
         self.assertEqual(page_metadata(URL,today=dt.date(2026,9,27))['page'],1)
         with self.assertRaises(ValueError):SameSiteRedirect().redirect_request(None,None,302,'',{},'https://evil.test/')
 
+    def test_shared_aldi_archive_accepts_nord_and_sued_pages(self):
+        nord=URL.replace('/lidl/','/aldi-nord/');sued=URL.replace('/lidl/','/aldi-sued/')
+        urls=discover(f'<a href="{nord}">Nord</a><a href="{sued}">Süd</a>', 'https://angebote.com/aldi/archives',1)
+        self.assertEqual(urls,[sued])
+
     def test_missing_ocr_never_falls_back_to_whole_page(self):
         with self.assertRaises(ValueError):parse_page(HTML.replace('<!-- OCR -->',''),URL)
 
@@ -46,7 +51,7 @@ class Tests(unittest.TestCase):
             self.assertFalse((out/'pages.jsonl').exists())
 
     def test_manifest_limit_is_explicit_and_duplicates_are_rejected(self):
-        for urls in [[URL]*2, [URL.replace('-seite-1-',f'-seite-{i}-') for i in range(1,34)]]:
+        for urls in [[URL]*2, [URL.replace('-seite-1-',f'-seite-{i}-') for i in range(1,MAX_MANIFEST_PAGES+2)]]:
             with tempfile.TemporaryDirectory() as temp:
                 manifest=Path(temp)/'sources.json';manifest.write_text(json.dumps({'pages':urls}))
                 with patch('angebote_archive.Fetcher.load_robots',return_value='User-agent: *\nDisallow:\n'):

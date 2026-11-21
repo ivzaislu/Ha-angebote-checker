@@ -14,6 +14,7 @@ from pathlib import Path
 
 AGENT = 'Ha-Angebote-Checker/0.1 (+archive-pilot)'
 LIMIT = 2_000_000
+MAX_MANIFEST_PAGES = 48
 PAGE = re.compile(r'^/(?P<retailer>[a-z0-9-]+)/woche-\d+-ab-(?P<start>\d{2}-\d{2}-\d{4})-bis-(?P<end>\d{2}-\d{2}-\d{4})-seite-(?P<page>\d+)-(?P<code>[a-z0-9]+)$')
 
 
@@ -173,7 +174,7 @@ def discover(html, archive_url, max_pages):
             meta = page_metadata(url)
         except ValueError:
             continue
-        if meta['retailer'] == retailer and meta['page'] == 1:
+        if (meta['retailer'] == retailer or retailer == 'aldi' and meta['retailer'] in ('aldi-nord','aldi-sued','aldi-sud')) and meta['page'] == 1:
             candidates.append((meta['validTo'], url))
     if not candidates:
         raise ValueError('Keine abgeschlossenen historischen Prospekte gefunden')
@@ -193,8 +194,8 @@ def collect(out, manifest=None, archive_url=None, max_pages=2):
         (out / 'robots.txt').write_text(fetcher.load_robots(), encoding='utf-8')
         if manifest:
             urls = json.loads(Path(manifest).read_text(encoding='utf-8'))['pages']
-            if not isinstance(urls, list) or not 1 <= len(urls) <= 32 or len(set(urls)) != len(urls):
-                raise ValueError('Das Manifest muss 1–32 verschiedene Seiten enthalten')
+            if not isinstance(urls, list) or not 1 <= len(urls) <= MAX_MANIFEST_PAGES or len(set(urls)) != len(urls):
+                raise ValueError('Das Manifest muss 1–48 verschiedene Seiten enthalten')
             for url in urls:
                 page_metadata(url)
         else:

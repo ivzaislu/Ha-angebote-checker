@@ -19,6 +19,7 @@ export const COUNTRIES: Record<
       "Rossmann",
       "Müller",
       "Norma",
+      "NKD",
       "Globus",
       "tegut",
       "Hit",

@@ -23,6 +23,16 @@ try {
   assert.equal(await page.locator('html').getAttribute('lang'), 'de');
   assert.doesNotMatch(await page.locator('body').innerText(), /[А-Яа-яЁё]/);
   await page.getByRole('button', {name:'Einkauf 0', exact:true}).waitFor();
+  await page.getByText('Geschäfte',{exact:true}).click();
+  await page.getByRole('button',{name:'Norma',exact:true}).waitFor();
+  await page.getByRole('button',{name:'NKD',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('angebote-v1')).state.retailers),['NKD']);
+  await page.reload();
+  await page.getByText('aktiv · v2',{exact:true}).waitFor();
+  await page.getByText('Geschäfte',{exact:true}).click();
+  await page.getByRole('button',{name:'NKD',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('angebote-v1')).state.retailers),[]);
+  await page.getByText('Geschäfte',{exact:true}).click();
   await page.locator('#item').fill('FrontendProbe');
   await page.getByRole('button', {name:'Hinzufügen', exact:true}).click();
   await page.getByRole('button', {name:'Entfernen FrontendProbe', exact:true}).waitFor();

@@ -45,3 +45,33 @@ export function prepareArchiveExperiment(
   if(extra.some(r=>heldGroups.has(productGroup(r))))throw new Error("Archivprüfprodukte dürfen nicht trainiert werden");
   return {baseline:prepareProductDataset(base,control),candidate:prepareProductDataset([...base,...extra],control)};
 }
+
+/** Replay the fixed prior archive without ever reusing a measured holdout for training. */
+export function preparePreviousArchiveDataset(
+ authored:{curriculum:ProductExample[];control:ProductExample[]},
+ current:{train:ProductExample[];holdout:ProductExample[]},
+ previous:{train:ProductExample[];holdout:ProductExample[]},scope:ScopeCases,
+){
+ const held=new Map(current.holdout.map(r=>[exampleKey(r),r.positive]));
+ if(previous.holdout.some(r=>held.get(exampleKey(r))!==r.positive))
+   throw new Error("Frühere Prüfantworten müssen unverändert zurückgehalten bleiben");
+ const heldGroups=new Set(current.holdout.map(productGroup));
+ const trainKeys=new Map(current.train.map(r=>[exampleKey(r),r.positive]));
+ const train=previous.train.filter(r=>!heldGroups.has(productGroup(r)));
+ if(train.some(r=>trainKeys.get(exampleKey(r))!==r.positive))
+   throw new Error("Die frühere Trainingsreferenz ist kein unveränderter Teil der neuen Partie");
+ return prepareArchiveExperiment(authored,{train,holdout:current.holdout},scope).candidate;
+}
+
+/** Final experiment gate only; never used to pick weights, epochs, or scope. */
+export function archiveReleaseGate(cohorts:Record<string,{
+ reference:{fp:number;fn:number;count:number};candidate:{fp:number;fn:number;count:number};
+}>) {
+ const reasons:string[]=[];
+ for(const [id,{reference,candidate}] of Object.entries(cohorts)){
+  if(reference.count!==candidate.count)reasons.push(`${id}: Unterschiedliche Prüfumfänge`);
+  if(candidate.fp>reference.fp)reasons.push(`${id}: Mehr falsche Treffer (${candidate.fp} statt ${reference.fp})`);
+  if(candidate.fn>reference.fn)reasons.push(`${id}: Mehr übersehene Treffer (${candidate.fn} statt ${reference.fn})`);
+ }
+ return {passed:reasons.length===0,reasons};
+}
