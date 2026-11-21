@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+const port=process.env.APP_PORT || '8080';
+const browser=await chromium.launch({headless:true,args:['--no-proxy-server','--host-resolver-rules=MAP angebote-http.test 127.0.0.1']});
+try {
+  const page=await browser.newPage();
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.route('https://fonts.googleapis.com/**',route=>route.abort());
+  await page.route('https://fonts.gstatic.com/**',route=>route.abort());
+  await page.route('https://cdn.marktguru.de/**',route=>route.abort());
+  await page.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
+  await page.getByText('Нейросеть товаров',{exact:true}).click();
+  await page.getByText('активна · v2',{exact:true}).waitFor();
+  const active=(await page.getByTestId('active-text-model').innerText()).match(/product-v2-[a-f0-9]+/)[0];
+  await page.locator('#training-key').fill('wrong-key');
+  await page.getByRole('button',{name:'Разобрать последний отказ',exact:true}).click();
+  await page.getByRole('alert').waitFor();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await page.getByRole('button',{name:'Разобрать последний отказ',exact:true}).click();
+  await page.getByTestId('review-target').getByText(/Разбор отклонённого кандидата/).waitFor();
+  await page.getByText(/Конфликт из сохранённого отчёта кандидата/).waitFor();
+  await page.getByText('Товар: Tafeläpfel XXL',{exact:true}).waitFor();
+  assert.equal((await page.getByTestId('active-text-model').innerText()).match(/product-v2-[a-f0-9]+/)[0],active);
+  await page.getByTestId('review-card').getByRole('button',{name:'Подходит',exact:true}).click();
+  await page.getByText('Доступные конфликты проверены. Теперь запустите новое обучение.',{exact:true}).waitFor();
+  await page.getByText('Проверенных примеров в базе: 3.',{exact:true}).waitFor();
+  await page.reload();
+  await page.getByText('Нейросеть товаров',{exact:true}).click();
+  await page.locator('#training-key').fill(process.env.TRAINING_ADMIN_TOKEN || '');
+  await page.getByRole('button',{name:'Разобрать последний отказ',exact:true}).click();
+  await page.getByText('Доступные конфликты проверены. Теперь запустите новое обучение.',{exact:true}).waitFor();
+  assert.equal((await page.getByTestId('active-text-model').innerText()).match(/product-v2-[a-f0-9]+/)[0],active);
+  assert.deepEqual(errors,[]);
+  console.log('Rejected-candidate browser review passed: owner auth, stored conflict, persisted correction, active model unchanged');
+}finally{await browser.close();}

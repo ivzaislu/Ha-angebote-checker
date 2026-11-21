@@ -4,7 +4,7 @@ import { prepareTrainingData, type ArchiveSql, type TrainingSource } from "./off
 import type { ProductExample } from "./product-net.ts";
 import { productProbability, PRODUCT_ACCEPT_SCORE, PRODUCT_REJECT_SCORE } from "./product-net.ts";
 import type { ProductModelPackage } from "./product-model-store.ts";
-import { decideProduct } from "./product-policy.ts";
+import { decideProduct, decideWithProductPolicy, policyForModel } from "./product-policy.ts";
 import { exampleKey, productGroup } from "./product-training.ts";
 import { reviewPresentation, type ReviewPresentationSource } from "./review-presentation.ts";
 import {
@@ -31,7 +31,36 @@ export type ReviewCard = {
   imageUrl: string | null;
   shortName: boolean;
   categoryGroup: string;
+  reportedConflict: boolean;
 };
+export type ReviewOptions = {
+  inspectCandidate?: boolean;
+  onlyReportedConflicts?: boolean;
+  priorityExamples?: ProductExample[];
+};
+export function reportedReviewExamples(model: ProductModelPackage | null): ProductExample[] {
+  const rows = model?.report.deployment?.weakConflicts;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .slice(0, 20)
+    .filter(
+      (row) =>
+        typeof row.intent === "string" &&
+        row.intent.length <= 80 &&
+        EXACT_QUERIES.some((rule) => rule.query === row.intent) &&
+        typeof row.name === "string" &&
+        row.name.length <= 180 &&
+        typeof row.category === "string" &&
+        row.category.length <= 180 &&
+        typeof row.description === "string" &&
+        row.description.length <= 600 &&
+        typeof row.positive === "boolean",
+    )
+    .map((row) => ({ ...row, source: "rules" }));
+}
+function textKey(row: ProductExample) {
+  return exampleKey({ ...row, intent: "" });
+}
 export function reviewedKey(row: ProductExample) {
   return createHash("sha256").update(exampleKey(row)).digest("hex");
 }
@@ -50,11 +79,33 @@ export function reviewCandidates(
   reviewed: Set<string>,
   model: ProductModelPackage | null,
   controls: Set<string>,
+  options: ReviewOptions = {},
 ): ReviewCard[] {
-  const weak = prepareTrainingData(snapshots.filter((row) => reviewable(row, controls)));
+  const eligibleSnapshots = snapshots.filter((row) => reviewable(row, controls));
+  const weak = prepareTrainingData(eligibleSnapshots);
   const originals = new Map(snapshots.map((row) => [row.snapshot_id, row]));
+  const byText = new Map<string, ReviewSnapshot>();
+  for (const snapshot of eligibleSnapshots) {
+    const key = textKey({ ...snapshot, intent: "", positive: false, source: "rules" });
+    if (!byText.has(key)) byText.set(key, snapshot);
+  }
   const seen = new Set<string>();
-  const available = weak.flatMap((row) => {
+  const priority = (options.priorityExamples ?? []).flatMap((example) => {
+    const snapshot = byText.get(textKey(example));
+    const id = reviewedKey(example);
+    if (!snapshot || reviewed.has(id) || seen.has(id)) return [];
+    seen.add(id);
+    return [
+      {
+        row: { ...example, provenance: { snapshotId: snapshot.snapshot_id } },
+        example,
+        id,
+        distant: false,
+        reported: true,
+      },
+    ];
+  });
+  const available = (options.onlyReportedConflicts ? [] : weak).flatMap((row) => {
     if (incompatibleCategory(row.intent, row.category)) return [];
     const example: ProductExample = { ...row, source: "rules" };
     const id = reviewedKey(example);
@@ -66,36 +117,47 @@ export function reviewCandidates(
         example,
         id,
         distant: !row.positive && distantReviewCategory(row.intent, row.category),
+        reported: false,
       },
     ];
   });
-  const near = available.filter((row) => !row.distant).slice(0, REVIEW_SCORE_LIMIT - 100);
-  const far = available.filter((row) => row.distant).slice(0, REVIEW_SCORE_LIMIT - near.length);
-  const candidates = [...near, ...far].flatMap(({ row, example, id, distant }) => {
-    const decision = decideProduct(model, example);
-    const score = model ? productProbability(model.net, example) : 0.5;
-    const conflict = decision.fromBrain && decision.keep !== row.positive;
-    if (distant && !conflict) return [];
-    const uncertain = score > PRODUCT_REJECT_SCORE && score < PRODUCT_ACCEPT_SCORE;
-    const reason: ReviewCard["reason"] = conflict ? "conflict" : uncertain ? "uncertain" : "sample";
-    return [
-      {
-        card: {
-          id,
-          snapshotId: row.provenance.snapshotId,
-          intent: row.intent,
-          name: row.name,
-          category: row.category,
-          description: row.description,
-          reason,
-          categoryGroup: productCategory(row.category).label,
-          ...reviewPresentation(originals.get(row.provenance.snapshotId)!),
+  const budget = REVIEW_SCORE_LIMIT - priority.length;
+  const near = available.filter((row) => !row.distant).slice(0, Math.max(0, budget - 100));
+  const far = available.filter((row) => row.distant).slice(0, budget - near.length);
+  const candidates = [...priority, ...near, ...far].flatMap(
+    ({ row, example, id, distant, reported }) => {
+      // Review may inspect failed weights; search still uses decideProduct and only
+      // qualified active models. No training or activation occurs here.
+      const decision =
+        options.inspectCandidate && model
+          ? decideWithProductPolicy(policyForModel(model), example)
+          : decideProduct(model, example);
+      const score = model ? productProbability(model.net, example) : 0.5;
+      const conflict = decision.fromBrain && decision.keep !== row.positive;
+      if (distant && !conflict) return [];
+      const uncertain = score > PRODUCT_REJECT_SCORE && score < PRODUCT_ACCEPT_SCORE;
+      const reason: ReviewCard["reason"] =
+        reported || conflict ? "conflict" : uncertain ? "uncertain" : "sample";
+      return [
+        {
+          card: {
+            id,
+            snapshotId: row.provenance.snapshotId,
+            intent: row.intent,
+            name: row.name,
+            category: row.category,
+            description: row.description,
+            reason,
+            categoryGroup: productCategory(row.category).label,
+            reportedConflict: reported,
+            ...reviewPresentation(originals.get(row.provenance.snapshotId)!),
+          },
+          rank: reported ? -1 : conflict ? 0 : uncertain ? 1 : 2,
+          distance: Math.abs(score - 0.5),
         },
-        rank: conflict ? 0 : uncertain ? 1 : 2,
-        distance: Math.abs(score - 0.5),
-      },
-    ];
-  });
+      ];
+    },
+  );
   return candidates
     .sort(
       (a, b) => a.rank - b.rank || a.distance - b.distance || a.card.id.localeCompare(b.card.id),
@@ -113,25 +175,62 @@ export async function loadReviewQueue(
   sql: ArchiveSql,
   model: ProductModelPackage | null,
   controls: Set<string>,
+  options: ReviewOptions = {},
 ) {
-  const snapshots =
-    await sql.query<ReviewSnapshot>(`select snapshot_id,country,offer_id,name,description,category,variant_key,
+  const snapshots = options.onlyReportedConflicts
+    ? []
+    : await sql.query<ReviewSnapshot>(`select snapshot_id,country,offer_id,name,description,category,variant_key,
     case when jsonb_typeof(raw_payload->'name')='string' then raw_payload->>'name' end as offer_name,
     case when jsonb_typeof(raw_payload->'product'->'name')='string' then raw_payload->'product'->>'name' end as catalog_name
     from offer_archive where country='de' order by observed_at desc,snapshot_id limit ${REVIEW_ARCHIVE_LIMIT}`);
+  const priorities = options.priorityExamples ?? [];
+  const prioritySnapshots = priorities.length
+    ? await sql.query<ReviewSnapshot>(
+        `with wanted as (
+    select name,category,description from jsonb_to_recordset($1::jsonb)
+      as x(name text,category text,description text)
+  ) select distinct on (a.name,a.category,a.description) a.snapshot_id,a.country,a.offer_id,a.name,a.description,a.category,a.variant_key,
+    case when jsonb_typeof(a.raw_payload->'name')='string' then a.raw_payload->>'name' end as offer_name,
+    case when jsonb_typeof(a.raw_payload->'product'->'name')='string' then a.raw_payload->'product'->>'name' end as catalog_name
+    from offer_archive a join wanted w on a.name=w.name and a.category=w.category and a.description=w.description
+    where a.country='de' order by a.name,a.category,a.description,a.observed_at desc,a.snapshot_id`,
+        [
+          JSON.stringify(
+            priorities.map((row) => ({
+              name: row.name,
+              category: row.category,
+              description: row.description,
+            })),
+          ),
+        ],
+      )
+    : [];
   const existing = await sql.query<{ example_key: string }>(
     "select example_key from product_review_labels",
   );
+  const reviewed = new Set(existing.map((row) => row.example_key));
+  const combined = [
+    ...new Map([...prioritySnapshots, ...snapshots].map((row) => [row.snapshot_id, row])).values(),
+  ];
+  const availableText = new Set(
+    combined
+      .filter((row) => reviewable(row, controls))
+      .map((row) => textKey({ ...row, intent: "", positive: false, source: "rules" })),
+  );
+  const uniquePriorities = [...new Map(priorities.map((row) => [reviewedKey(row), row])).entries()];
   return {
-    cards: reviewCandidates(
-      snapshots,
-      new Set(existing.map((row) => row.example_key)),
-      model,
-      controls,
-    ),
+    cards: reviewCandidates(combined, reviewed, model, controls, options),
+    reportedConflicts: uniquePriorities.length,
+    pendingConflicts: uniquePriorities.filter(
+      ([key, row]) => !reviewed.has(key) && availableText.has(textKey(row)),
+    ).length,
+    unavailableConflicts: uniquePriorities.filter(
+      ([key, row]) => !reviewed.has(key) && !availableText.has(textKey(row)),
+    ).length,
     reviewedCount: existing.length,
     archiveSnapshotsRead: snapshots.length,
     archiveReadLimit: REVIEW_ARCHIVE_LIMIT,
+    conflictSnapshotsRead: prioritySnapshots.length,
   };
 }
 export type ReviewAnswer = {

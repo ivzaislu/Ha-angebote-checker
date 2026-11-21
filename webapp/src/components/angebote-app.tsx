@@ -307,12 +307,12 @@ export function AngeboteApp() {
     const timer = setInterval(() => {
       void trainingStatus().then(async (status) => {
         if (cancelled) return;
-        setTraining(status);
-        setTrainingError("");
         if (status.job?.status !== "queued" && status.job?.status !== "running") {
           const model = await modelStatus();
-          if (!cancelled) setNeural(model);
+          if (cancelled) return;
+          setNeural(model);
         }
+        if (!cancelled) {setTraining(status);setTrainingError("");}
       }).catch(() => { if (!cancelled) setTrainingError("Связь прервана; повторяем проверку состояния обучения…"); });
     }, 3000);
     return () => { cancelled = true; clearInterval(timer); };
@@ -680,7 +680,7 @@ export function AngeboteApp() {
                 {neural?.active ? "активна · v2" : "не активирована"}
               </span>
             </summary>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted" data-testid="active-text-model">
               {neural?.active
                 ? `Версия ${neural.active.id}. Обучающих примеров: ${neural.active.trainCount}; проверочных: ${neural.active.validationCount}; контрольных: ${neural.active.testCount}. Поддерживаемых запросов: ${neural.active.supportedIntents.length}.`
                 : "Поиск использует правила. Новая нейросеть включается после отдельного обучения и проверки качества."}

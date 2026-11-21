@@ -5,7 +5,13 @@ import { PGlite } from "@electric-sql/pglite";
 import { archiveOffers, prepareTrainingData, type TrainingSource } from "./offer-archive.ts";
 import { newProductNet, type ProductExample } from "./product-net.ts";
 import type { ProductModelPackage } from "./product-model-store.ts";
-import { readReviewedLabels } from "./product-model-store.ts";
+import {
+  readReviewedLabels,
+  saveProductCandidate,
+  activateProductCandidate,
+  activeProductModelId,
+  latestRejectedProductModel,
+} from "./product-model-store.ts";
 import { prepareProductDataset, productGroup } from "./product-training.ts";
 import { reviewPresentation } from "./review-presentation.ts";
 import {
@@ -13,6 +19,7 @@ import {
   reviewCandidates,
   reviewedKey,
   saveArchiveReview,
+  reportedReviewExamples,
 } from "./product-review-queue.ts";
 
 const snapshot: TrainingSource = {
@@ -24,6 +31,163 @@ const snapshot: TrainingSource = {
   description: "Bio 1 l",
   variant_key: "{}",
 };
+test("reported conflicts bypass the scoring window and inspect failed weights without deploying them", () => {
+  const apple = {
+    ...snapshot,
+    snapshot_id: "apple",
+    name: "Tafeläpfel XXL",
+    category: "Äpfel",
+    description: "5 kg",
+  };
+  const example: ProductExample = { ...apple, intent: "Apfel", positive: true, source: "rules" };
+  const net = newProductNet();
+  net.w2.fill(0);
+  net.b2 = -20;
+  const model = {
+    id: "rejected",
+    net,
+    report: {
+      schemaVersion: 2,
+      eligible: false,
+      supportedIntents: ["Apfel"],
+      vocabulary: ["tafelapfel", "apfel"],
+      deployment: { weakConflicts: [example] },
+    },
+  } as unknown as ProductModelPackage;
+  const priorities = reportedReviewExamples(model);
+  const fillers = Array.from({ length: 620 }, (_, index) => ({
+    ...snapshot,
+    snapshot_id: `filler-${index}`,
+    name: `Frische Milch ${index}`,
+  }));
+  const cards = reviewCandidates([...fillers, apple], new Set(), model, new Set(), {
+    inspectCandidate: true,
+    priorityExamples: priorities,
+  });
+  assert.equal(cards[0].intent, "Apfel");
+  assert.equal(cards[0].reportedConflict, true);
+  assert.equal(cards[0].reason, "conflict");
+  const only = reviewCandidates([...fillers, apple], new Set(), model, new Set(), {
+    inspectCandidate: true,
+    onlyReportedConflicts: true,
+    priorityExamples: priorities,
+  });
+  assert.equal(only.length, 1);
+  assert.deepEqual(
+    reviewCandidates([apple], new Set([reviewedKey(example)]), model, new Set(), {
+      inspectCandidate: true,
+      onlyReportedConflicts: true,
+      priorityExamples: priorities,
+    }),
+    [],
+  );
+  assert.deepEqual(
+    reviewCandidates([apple], new Set(), model, new Set([productGroup(example)]), {
+      inspectCandidate: true,
+      onlyReportedConflicts: true,
+      priorityExamples: priorities,
+    }),
+    [],
+  );
+});
+
+test("rejected-model review retrieves old matching snapshots, persists explicit answers and leaves activation untouched", async () => {
+  const db = new PGlite();
+  try {
+    for (const migration of ["0003_offer_archive.sql", "0004_product_models.sql"])
+      await db.exec(
+        await readFile(new URL(`../../migrations/${migration}`, import.meta.url), "utf8"),
+      );
+    const calls: string[] = [];
+    const sql = {
+      query: async <T>(text: string, params?: unknown[]) => {
+        calls.push(text);
+        return (await db.query<T>(text, params)).rows;
+      },
+    };
+    const seed = JSON.parse(
+      await readFile(new URL("./product-seed.json", import.meta.url), "utf8"),
+    ) as ProductModelPackage;
+    const active = await saveProductCandidate(sql, seed.net, seed.report);
+    await activateProductCandidate(sql, active.id, null);
+    const example: ProductExample = {
+      intent: "Apfel",
+      name: "Tafeläpfel XXL",
+      category: "Äpfel",
+      description: "5 kg",
+      positive: true,
+      source: "rules",
+    };
+    const missing = { ...example, name: "No archived product" };
+    const net = structuredClone(seed.net);
+    net.w2.fill(0);
+    net.b2 = -20;
+    const report = {
+      ...seed.report,
+      eligible: false,
+      reasons: ["weak validation: review required"],
+      supportedIntents: ["Apfel"],
+      vocabulary: ["tafelapfel", "apfel"],
+      deployment: {
+        ...seed.report.deployment!,
+        weakConflicts: [
+          { ...example, modelDecision: false, modelScore: 0.01, source: "rules" as const },
+          { ...missing, modelDecision: false, modelScore: 0.01, source: "rules" as const },
+        ],
+      },
+    };
+    const rejected = await saveProductCandidate(sql, net, report);
+    assert.equal((await latestRejectedProductModel(sql))?.id, rejected.id);
+    await archiveOffers(sql, "de", "73431", [
+      {
+        id: "apple",
+        name: example.name,
+        description: example.description,
+        categories: [{ name: example.category }],
+        price: 5,
+      },
+    ]);
+    await sql.query("update offer_archive set observed_at='2020-01-01'::timestamptz");
+    const options = {
+      inspectCandidate: true,
+      onlyReportedConflicts: true,
+      priorityExamples: reportedReviewExamples(rejected),
+    };
+    calls.length = 0;
+    const queue = await loadReviewQueue(sql, rejected, new Set(), options);
+    assert.equal(queue.cards.length, 1);
+    assert.equal(queue.pendingConflicts, 1);
+    assert.equal(queue.reportedConflicts, 2);
+    assert.equal(queue.unavailableConflicts, 1);
+    assert.equal(queue.archiveSnapshotsRead, 0);
+    assert.equal(queue.conflictSnapshotsRead, 1);
+    assert.ok(
+      !calls.some((text) => text.includes("limit 10000")),
+      "Focused review must not depend on the latest archive window",
+    );
+    assert.equal((await readReviewedLabels(sql)).length, 0, "Loading never creates a human answer");
+    const card = queue.cards[0];
+    await saveArchiveReview(
+      sql,
+      { snapshotId: card.snapshotId, intent: card.intent, positive: true },
+      new Set(),
+    );
+    const after = await loadReviewQueue(sql, rejected, new Set(), options);
+    assert.equal(after.cards.length, 0);
+    assert.equal(after.pendingConflicts, 0);
+    assert.equal(after.unavailableConflicts, 1);
+    assert.equal(await activeProductModelId(sql), active.id);
+    const [stored] = await sql.query<{ report: { eligible: boolean } }>(
+      "select report from product_models where id=$1",
+      [rejected.id],
+    );
+    assert.equal(stored.report.eligible, false);
+    await assert.rejects(activateProductCandidate(sql, rejected.id, active.id), /quality gate/);
+    assert.equal((await readReviewedLabels(sql))[0].source, "human");
+  } finally {
+    await db.close();
+  }
+});
 test("review presents fuller source titles and safe CDN photos without changing training identity", () => {
   const row = { ...snapshot, offer_name: "Alpen Bio Frische Milch", catalog_name: snapshot.name };
   const [card] = reviewCandidates([row], new Set(), null, new Set());

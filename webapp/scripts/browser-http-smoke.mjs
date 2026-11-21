@@ -116,6 +116,10 @@ try {
   await other.getByTestId('training-status').getByText(/Подготовка обучающих данных|Нейросеть обучается|Проверка и сохранение|Обучение в очереди|Обучение завершено/).first().waitFor();
   const terminal = /Обучение завершено\. (Модель включена|Качество не прошло проверку)/;
   await other.getByTestId('training-status').getByText(terminal).waitFor({timeout:180_000});
+  if((await other.getByTestId('training-status').innerText()).includes('Модель включена.')) {
+    const candidate=(await other.getByTestId('training-status').innerText()).match(/product-v2-[a-f0-9]+/)[0];
+    await other.getByTestId('active-text-model').filter({hasText:candidate}).waitFor();
+  }
   await other.reload();
   await other.getByText('Нейросеть товаров',{exact:true}).click();
   await other.getByTestId('training-status').getByText(terminal).waitFor();

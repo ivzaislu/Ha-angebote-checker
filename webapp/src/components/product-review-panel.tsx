@@ -49,11 +49,11 @@ export function ProductReviewPanel({
   const [error, setError] = useState("");
   const [last, setLast] = useState<{ card: ReviewCard; positive: boolean } | null>(null);
   const card = batch?.cards[0];
-  async function loadBatch() {
+  async function loadBatch(mode: "active" | "rejected" = "active") {
     setBusy(true);
     setError("");
     try {
-      const result = await load({ data: { key: ownerKey } });
+      const result = await load({ data: { key: ownerKey, mode } });
       setBatch(result);
       onReviewed(result.reviewedCount);
     } catch (error) {
@@ -82,6 +82,13 @@ export function ProductReviewPanel({
           ? {
               ...batch,
               reviewedCount: result.reviewedCount,
+              pendingConflicts: Math.max(
+                0,
+                batch.pendingConflicts -
+                  (batch.cards.some((row) => row.id === selected.id && row.reportedConflict)
+                    ? 1
+                    : 0),
+              ),
               cards: batch.cards.filter((row) => row.id !== selected.id),
             }
           : batch,
@@ -117,6 +124,45 @@ export function ProductReviewPanel({
       >
         {busy ? "Обрабатываем…" : "Загрузить примеры для проверки"}
       </button>
+      <button
+        type="button"
+        disabled={busy || !ownerKey.trim()}
+        onClick={() => void loadBatch("rejected")}
+        className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50"
+      >
+        Разобрать последний отказ
+      </button>
+      {batch ? (
+        <div className="space-y-1 text-xs text-muted" data-testid="review-target">
+          <p>
+            {batch.reviewModel.mode === "rejected"
+              ? "Разбор отклонённого кандидата"
+              : "Проверка действующей модели"}
+            : {batch.reviewModel.id ?? "правила"}. Схема признаков:{" "}
+            {batch.reviewModel.featureVersion}.
+          </p>
+          {batch.reviewModel.mode === "rejected" ? (
+            <>
+              <p>
+                Разбор не включает кандидата. Подтвердите ответы, затем запустите новое обучение.
+              </p>
+              <p>
+                Конфликтов в отчёте: {batch.reportedConflicts}; доступно непроверенных:{" "}
+                {batch.pendingConflicts}.
+              </p>
+              {batch.unavailableConflicts ? (
+                <p>
+                  Недоступно для разметки: {batch.unavailableConflicts} (нет подходящего снимка или
+                  пример исключён).
+                </p>
+              ) : null}
+              {batch.reviewModel.reasons.map((reason) => (
+                <p key={reason}>{reason}</p>
+              ))}
+            </>
+          ) : null}
+        </div>
+      ) : null}
       {!ownerKey.trim() ? <p className="text-xs text-muted">Введите ключ владельца выше.</p> : null}
       {card ? (
         <article data-testid="review-card" className="space-y-2 rounded-md border border-line p-3">
@@ -143,11 +189,13 @@ export function ProductReviewPanel({
             <p className="whitespace-pre-wrap text-sm">{card.description}</p>
           ) : null}
           <p className="text-xs text-muted">
-            {card.reason === "conflict"
-              ? "Модель и автоматическое правило расходятся."
-              : card.reason === "uncertain"
-                ? "Ответ сети неопределённый."
-                : "Учебная пара для проверки; показ карточки не означает совпадение."}
+            {card.reportedConflict
+              ? "Конфликт из сохранённого отчёта кандидата. Автоматическая метка требует вашей проверки."
+              : card.reason === "conflict"
+                ? "Модель и автоматическое правило расходятся."
+                : card.reason === "uncertain"
+                  ? "Ответ сети неопределённый."
+                  : "Учебная пара для проверки; показ карточки не означает совпадение."}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -183,13 +231,21 @@ export function ProductReviewPanel({
         </article>
       ) : batch ? (
         <p className="text-sm">
-          Порция закончилась. Загрузите следующую; если примеров нет, обновите архив акций.
+          {batch.reviewModel.mode === "rejected"
+            ? batch.reportedConflicts === 0
+              ? "В отчёте нет конфликтов слабой разметки для этой очереди. Причины отказа показаны выше."
+              : batch.pendingConflicts === 0 && batch.unavailableConflicts === 0
+                ? "Доступные конфликты проверены. Теперь запустите новое обучение."
+                : "Проверьте оставшиеся случаи или загрузите разбор заново."
+            : "Порция закончилась. Загрузите следующую; если примеров нет, обновите архив акций."}
         </p>
       ) : null}
       {batch ? (
         <p className="text-xs text-muted">
-          Очередь из последних {batch.archiveSnapshotsRead} снимков Германии; предел{" "}
-          {batch.archiveReadLimit}. Контрольные товары исключены.
+          {batch.reviewModel.mode === "rejected"
+            ? `Снимков для конфликтов: ${batch.conflictSnapshotsRead}. Поиск по сохранённым текстам отчёта, без ограничения последними акциями.`
+            : `Очередь из последних ${batch.archiveSnapshotsRead} снимков Германии; предел ${batch.archiveReadLimit}.`}{" "}
+          Контрольные товары исключены.
         </p>
       ) : null}
       {last ? (

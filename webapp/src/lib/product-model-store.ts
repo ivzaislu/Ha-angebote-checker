@@ -44,6 +44,16 @@ export async function activeProductModelId(sql: ArchiveSql): Promise<string | nu
   );
   return row?.model_id ?? null;
 }
+/** Inspection only: returning a rejected candidate never changes the active pointer. */
+export async function latestRejectedProductModel(
+  sql: ArchiveSql,
+): Promise<ProductModelPackage | null> {
+  const [row] = await sql.query<{ id: string }>(`select id from product_models
+    where report->>'eligible'='false' and report->>'schemaVersion'='2'
+      and jsonb_typeof(report->'deployment')='object'
+    order by created_at desc,id desc limit 1`);
+  return row ? readProductCandidate(sql, row.id) : null;
+}
 /** Lease prevents an older training process from replacing a newly activated model. */
 export async function activateProductCandidate(
   sql: ArchiveSql,

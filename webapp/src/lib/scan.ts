@@ -111,10 +111,10 @@ export const trainNeuralModel = createServerFn({ method: "POST" })
   });
 
 export const neuralReviewQueue = createServerFn({ method: "POST" })
-  .validator((data:unknown) => z.object({key:z.string().max(512)}).parse(data))
+  .validator((data:unknown) => z.object({key:z.string().max(512),mode:z.enum(["active","rejected"]).default("active")}).parse(data))
   .handler(async ({data}) => {
     const {reviewQueue}=await import("@/lib/product-review.server");
-    return reviewQueue(data.key);
+    return reviewQueue(data.key,data.mode);
   });
 
 export const answerNeuralReview = createServerFn({ method: "POST" })
