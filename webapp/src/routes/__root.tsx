@@ -12,7 +12,7 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#f4f0e7" },
       {
         name: "description",
-        content: "Список покупок сверяется с текущими проспектами магазинов.",
+        content: "Vergleichen Sie Ihre Einkaufsliste mit den aktuellen Angeboten der Geschäfte.",
       },
     ],
     links: [
@@ -28,8 +28,11 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
+  notFoundComponent: () => (
+    <main className="p-6"><h1>Seite nicht gefunden</h1><a href="/">Zur Startseite</a></main>
+  ),
   component: () => (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="de" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

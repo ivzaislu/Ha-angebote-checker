@@ -1,3 +1,4 @@
+import { trainingReason, displayError } from "@/lib/locale";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { neuralReviewQueue, answerNeuralReview } from "@/lib/scan";
@@ -8,7 +9,7 @@ function ReviewPhoto({ url, name }: { url: string | null; name: string }) {
   if (!url || failed)
     return (
       <p className="text-xs text-muted" data-testid="review-image-unavailable">
-        Фото недоступно. Если названия и описания недостаточно, пропустите пример.
+        Foto nicht verfügbar. Überspringen Sie das Beispiel, wenn Name und Beschreibung nicht ausreichen.
       </p>
     );
   return (
@@ -17,11 +18,11 @@ function ReviewPhoto({ url, name }: { url: string | null; name: string }) {
       target="_blank"
       rel="noopener noreferrer"
       className="block"
-      title="Открыть фото крупнее"
+      title="Foto vergrößern"
     >
       <img
         src={url}
-        alt={`Фото товара: ${name}`}
+        alt={`Produktfoto: ${name}`}
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
@@ -57,7 +58,7 @@ export function ProductReviewPanel({
       setBatch(result);
       onReviewed(result.reviewedCount);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Не удалось загрузить примеры");
+      setError(displayError(error, "Beispiele konnten nicht geladen werden"));
     } finally {
       setBusy(false);
     }
@@ -94,7 +95,7 @@ export function ProductReviewPanel({
           : batch,
       );
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Не удалось сохранить ответ");
+      setError(displayError(error, "Antwort konnte nicht gespeichert werden"));
     } finally {
       setBusy(false);
     }
@@ -102,19 +103,17 @@ export function ProductReviewPanel({
   return (
     <section
       className="mt-4 space-y-3 border-t border-line pt-3"
-      aria-label="Ручная проверка товаров"
+      aria-label="Produkte manuell prüfen"
     >
-      <h3 className="text-sm font-medium">Помочь нейросети</h3>
+      <h3 className="text-sm font-medium">Dem neuronalen Netz helfen</h3>
       <p className="text-xs text-muted">
-        Фото помогает вам при проверке. Нейросеть анализирует текст и категории, изображения не
-        анализирует.
+        Das Foto hilft Ihnen bei der Prüfung. Das neuronale Netz wertet Text und Kategorien aus. Es analysiert keine Bilder.
       </p>
       <p className="text-xs text-muted" data-testid="review-count">
-        Проверенных примеров в базе: {batch?.reviewedCount ?? reviewedCount}.
+        Geprüfte Beispiele in der Datenbank: {batch?.reviewedCount ?? reviewedCount}.
       </p>
       <p className="text-xs text-muted">
-        Сравните запрос с товаром. Ответы сохраняются для следующего обучения; веса действующей
-        модели сейчас не меняются. Если данных недостаточно, пропустите пример.
+        Vergleichen Sie die Suchanfrage mit dem Produkt. Ihre Antworten werden für das nächste Training gespeichert. Das aktive Modell bleibt dabei unverändert. Überspringen Sie das Beispiel, wenn Angaben fehlen.
       </p>
       <button
         type="button"
@@ -122,7 +121,7 @@ export function ProductReviewPanel({
         disabled={busy || !ownerKey.trim()}
         onClick={() => void loadBatch()}
       >
-        {busy ? "Обрабатываем…" : "Загрузить примеры для проверки"}
+        {busy ? "Wird verarbeitet…" : "Beispiele zur Prüfung laden"}
       </button>
       <button
         type="button"
@@ -130,72 +129,71 @@ export function ProductReviewPanel({
         onClick={() => void loadBatch("rejected")}
         className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50"
       >
-        Разобрать последний отказ
+        Letzte Ablehnung prüfen
       </button>
       {batch ? (
         <div className="space-y-1 text-xs text-muted" data-testid="review-target">
           <p>
             {batch.reviewModel.mode === "rejected"
-              ? "Разбор отклонённого кандидата"
-              : "Проверка действующей модели"}
-            : {batch.reviewModel.id ?? "правила"}. Схема признаков:{" "}
+              ? "Prüfung des abgelehnten Kandidaten"
+              : "Prüfung des aktiven Modells"}
+            : {batch.reviewModel.id ?? "Regeln"}. Merkmalsschema:{" "}
             {batch.reviewModel.featureVersion}.
           </p>
           {batch.reviewModel.mode === "rejected" ? (
             <>
               <p>
-                Разбор не включает кандидата. Подтвердите ответы, затем запустите новое обучение.
+                Die Prüfung aktiviert den Kandidaten nicht. Bestätigen Sie die Antworten und starten Sie anschließend ein neues Training.
               </p>
               <p>
-                Конфликтов в отчёте: {batch.reportedConflicts}; доступно непроверенных:{" "}
+                Konflikte im Bericht: {batch.reportedConflicts}; noch ungeprüft verfügbar:{" "}
                 {batch.pendingConflicts}.
               </p>
               {batch.unavailableConflicts ? (
                 <p>
-                  Недоступно для разметки: {batch.unavailableConflicts} (нет подходящего снимка или
-                  пример исключён).
+                  Nicht zur Bewertung verfügbar: {batch.unavailableConflicts} (kein passender Archiveintrag oder Beispiel ausgeschlossen).
                 </p>
               ) : null}
               {batch.reviewModel.reasons.map((reason) => (
-                <p key={reason}>{reason}</p>
+                <p key={reason}>{trainingReason(reason)}</p>
               ))}
             </>
           ) : null}
         </div>
       ) : null}
-      {!ownerKey.trim() ? <p className="text-xs text-muted">Введите ключ владельца выше.</p> : null}
+      {!ownerKey.trim() ? <p className="text-xs text-muted">Geben Sie oben den Inhaberschlüssel ein.</p> : null}
       {card ? (
         <article data-testid="review-card" className="space-y-2 rounded-md border border-line p-3">
           <p className="text-sm">
-            Запрос: <strong>{card.intent}</strong>
+            Suchanfrage: <strong>{card.intent}</strong>
           </p>
           <p className="break-words text-sm font-medium" data-testid="review-product-name">
-            Товар: {card.displayName}
+            Produkt: {card.displayName}
           </p>
           {card.otherNames.map((name) => (
             <p key={name} className="break-words text-xs text-muted">
-              Другое название в источнике: {name}
+              Weiterer Name in der Quelle: {name}
             </p>
           ))}
           <ReviewPhoto key={card.snapshotId} url={card.imageUrl} name={card.displayName} />
           {card.shortName ? (
             <p className="text-xs text-muted">
-              В архиве короткое название. Уточните товар по фото и описанию или пропустите пример.
+              Der Archivname ist kurz. Prüfen Sie das Produkt anhand von Foto und Beschreibung oder überspringen Sie das Beispiel.
             </p>
           ) : null}
-          {card.category ? <p className="text-xs text-muted">Категория: {card.category}</p> : null}
-          <p className="text-xs text-muted">Группа товара: {card.categoryGroup}</p>
+          {card.category ? <p className="text-xs text-muted">Kategorie: {card.category}</p> : null}
+          <p className="text-xs text-muted">Produktgruppe: {card.categoryGroup}</p>
           {card.description ? (
             <p className="whitespace-pre-wrap text-sm">{card.description}</p>
           ) : null}
           <p className="text-xs text-muted">
             {card.reportedConflict
-              ? "Конфликт из сохранённого отчёта кандидата. Автоматическая метка требует вашей проверки."
+              ? "Konflikt aus dem gespeicherten Kandidatenbericht. Die automatische Bewertung muss von Ihnen geprüft werden."
               : card.reason === "conflict"
-                ? "Модель и автоматическое правило расходятся."
+                ? "Modell und automatische Regel widersprechen sich."
                 : card.reason === "uncertain"
-                  ? "Ответ сети неопределённый."
-                  : "Учебная пара для проверки; показ карточки не означает совпадение."}
+                  ? "Das Netz ist unsicher."
+                  : "Trainingspaar zur Prüfung. Die Anzeige bedeutet nicht, dass das Produkt passt."}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -204,7 +202,7 @@ export function ProductReviewPanel({
               className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50"
               onClick={() => void submit(card, true)}
             >
-              Подходит
+              Passt
             </button>
             <button
               type="button"
@@ -212,7 +210,7 @@ export function ProductReviewPanel({
               className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50"
               onClick={() => void submit(card, false)}
             >
-              Не подходит
+              Passt nicht
             </button>
             <button
               type="button"
@@ -222,37 +220,37 @@ export function ProductReviewPanel({
                 setBatch((batch) => (batch ? { ...batch, cards: batch.cards.slice(1) } : batch))
               }
             >
-              Пропустить
+              Überspringen
             </button>
           </div>
           <p className="text-xs text-muted">
-            В этой порции осталось: {batch?.cards.length}. Пропуск не сохраняет метку.
+            In dieser Auswahl verbleibend: {batch?.cards.length}. Beim Überspringen wird keine Bewertung gespeichert.
           </p>
         </article>
       ) : batch ? (
         <p className="text-sm">
           {batch.reviewModel.mode === "rejected"
             ? batch.reportedConflicts === 0
-              ? "В отчёте нет конфликтов слабой разметки для этой очереди. Причины отказа показаны выше."
+              ? "Der Bericht enthält keine Konflikte automatischer Bewertungen für diese Auswahl. Die Ablehnungsgründe stehen oben."
               : batch.pendingConflicts === 0 && batch.unavailableConflicts === 0
-                ? "Доступные конфликты проверены. Теперь запустите новое обучение."
-                : "Проверьте оставшиеся случаи или загрузите разбор заново."
-            : "Порция закончилась. Загрузите следующую; если примеров нет, обновите архив акций."}
+                ? "Alle verfügbaren Konflikte sind geprüft. Starten Sie jetzt ein neues Training."
+                : "Prüfen Sie die übrigen Fälle oder laden Sie die Prüfung erneut."
+            : "Auswahl abgeschlossen. Laden Sie die nächste Auswahl. Falls keine Beispiele verfügbar sind, aktualisieren Sie das Angebotsarchiv."}
         </p>
       ) : null}
       {batch ? (
         <p className="text-xs text-muted">
           {batch.reviewModel.mode === "rejected"
-            ? `Снимков для конфликтов: ${batch.conflictSnapshotsRead}. Поиск по сохранённым текстам отчёта, без ограничения последними акциями.`
-            : `Очередь из последних ${batch.archiveSnapshotsRead} снимков Германии; предел ${batch.archiveReadLimit}.`}{" "}
-          Контрольные товары исключены.
+            ? `Archiveinträge für Konflikte: ${batch.conflictSnapshotsRead}. Suche anhand der gespeicherten Berichtstexte, ohne Beschränkung auf die neuesten Angebote.`
+            : `Auswahl aus den neuesten ${batch.archiveSnapshotsRead} Archiveinträgen aus Deutschland; Obergrenze ${batch.archiveReadLimit}.`}{" "}
+          Produkte aus dem Kontrollsatz sind ausgeschlossen.
         </p>
       ) : null}
       {last ? (
         <div role="status" className="space-y-1 text-xs text-muted">
           <p>
-            Сохранено: «{last.card.name}» для «{last.card.intent}» —{" "}
-            {last.positive ? "подходит" : "не подходит"}.
+            Gespeichert: «{last.card.name}» für «{last.card.intent}» —{" "}
+            {last.positive ? "passt" : "passt nicht"}.
           </p>
           <button
             type="button"
@@ -260,7 +258,7 @@ export function ProductReviewPanel({
             disabled={busy || !ownerKey.trim()}
             onClick={() => void submit(last.card, !last.positive, last.positive)}
           >
-            Изменить последний ответ
+            Letzte Antwort ändern
           </button>
         </div>
       ) : null}

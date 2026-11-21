@@ -161,15 +161,15 @@ const PRODUCTS = [
 ];
 
 export const CATEGORIES = [
-  { id: "veg", label: "Овощи" },
-  { id: "fruit", label: "Фрукты" },
-  { id: "dairy", label: "Молочное" },
-  { id: "meat", label: "Мясо и рыба" },
-  { id: "bakery", label: "Хлеб" },
-  { id: "drinks", label: "Напитки" },
-  { id: "pantry", label: "Бакалея" },
-  { id: "sweet", label: "Сладкое" },
-  { id: "home", label: "Быт" },
+  { id: "veg", label: "Gemüse" },
+  { id: "fruit", label: "Obst" },
+  { id: "dairy", label: "Milchprodukte" },
+  { id: "meat", label: "Fleisch und Fisch" },
+  { id: "bakery", label: "Brot" },
+  { id: "drinks", label: "Getränke" },
+  { id: "pantry", label: "Vorräte" },
+  { id: "sweet", label: "Süßigkeiten" },
+  { id: "home", label: "Haushalt" },
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];

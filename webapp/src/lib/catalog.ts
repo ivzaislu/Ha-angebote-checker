@@ -5,7 +5,7 @@ export const COUNTRIES: Record<
   { label: string; zipLength: number; retailers: string[] }
 > = {
   de: {
-    label: "Германия",
+    label: "Deutschland",
     zipLength: 5,
     retailers: [
       "Aldi",
@@ -27,7 +27,7 @@ export const COUNTRIES: Record<
     ],
   },
   at: {
-    label: "Австрия",
+    label: "Österreich",
     zipLength: 4,
     retailers: [
       "Billa",

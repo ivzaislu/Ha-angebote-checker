@@ -17,9 +17,9 @@ test("training requires a configured owner key and persistent database", () => {
   assert.equal(trainingConfigured("short", "postgres://db"), false);
   assert.equal(trainingConfigured(token, undefined), false);
   assert.equal(trainingConfigured(token, "postgres://db"), true);
-  assert.throws(() => authorizeTraining("", token), /Неверный/);
-  assert.throws(() => authorizeTraining("wrong", token), /Неверный/);
-  assert.throws(() => authorizeTraining(token, undefined), /не настроено/);
+  assert.throws(() => authorizeTraining("", token), /Ungültiger/);
+  assert.throws(() => authorizeTraining("wrong", token), /Ungültiger/);
+  assert.throws(() => authorizeTraining(token, undefined), /nicht eingerichtet/);
   assert.doesNotThrow(() => authorizeTraining(token, token));
 });
 

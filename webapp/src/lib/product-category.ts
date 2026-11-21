@@ -10,53 +10,53 @@ const fold = (text: string) =>
 const groups = [
   {
     id: "cosmetics",
-    label: "Уход и косметика",
+    label: "Pflege und Kosmetik",
     domain: "nonfood",
     pattern:
       /gesichtspflege|korperpflege|hautpflege|kosmetik|haarpflege|zahnpflege|deodorant|duschgel|shampoo/,
   },
   {
     id: "cleaning",
-    label: "Бытовая химия",
+    label: "Reinigungs- und Waschmittel",
     domain: "nonfood",
     pattern: /waschmittel|reinigungsmittel|putzmittel|geschirrspulmittel|waschepflege/,
   },
   {
     id: "electronics",
-    label: "Техника",
+    label: "Technik",
     domain: "nonfood",
     pattern: /elektrogerate|unterhaltungselektronik|computer|smartphone|beleuchtung|leuchtmittel/,
   },
   {
     id: "paper",
-    label: "Бумага и гигиена",
+    label: "Papier und Hygiene",
     domain: "nonfood",
     pattern: /toilettenpapier|kuchenrolle|taschentucher|hygienepapier/,
   },
   {
     id: "dairy",
-    label: "Молочные продукты",
+    label: "Milchprodukte",
     domain: "food",
     pattern: /milch|joghurt|kase|quark|sahne|butter|margarine/,
   },
   {
     id: "produce",
-    label: "Овощи и фрукты",
+    label: "Obst und Gemüse",
     domain: "food",
     pattern: /gemuse|obst|(?:^| )fruchte(?: |$)|salat|kartoffel|pilz|champignon/,
   },
-  { id: "fish", label: "Рыба и морепродукты", domain: "food", pattern: /fisch|meeresfruchte/ },
-  { id: "meat", label: "Мясо", domain: "food", pattern: /fleisch|geflugel|wurst|schinken/ },
+  { id: "fish", label: "Fisch und Meeresfrüchte", domain: "food", pattern: /fisch|meeresfruchte/ },
+  { id: "meat", label: "Fleisch", domain: "food", pattern: /fleisch|geflugel|wurst|schinken/ },
   {
     id: "drinks",
-    label: "Напитки",
+    label: "Getränke",
     domain: "food",
     pattern: /getranke|saft|kaffee|tee|bier|wein|mineralwasser/,
   },
-  { id: "bakery", label: "Хлеб и выпечка", domain: "food", pattern: /backwaren|brot|brotchen/ },
+  { id: "bakery", label: "Brot und Backwaren", domain: "food", pattern: /backwaren|brot|brotchen/ },
   {
     id: "pantry",
-    label: "Бакалея и готовые блюда",
+    label: "Vorräte und Fertiggerichte",
     domain: "food",
     pattern:
       /lebensmittel|nahrungsmittel|reis|nudeln|konserven|fertiggerichte|tiefkuhlgerichte|cerealien/,
@@ -67,7 +67,7 @@ export function productCategory(text: string) {
   const matches = groups.filter((group) => group.pattern.test(normalized));
   // Mixed departments are not reliable enough for an exclusion.
   if (!matches.length || new Set(matches.map((group) => group.domain)).size > 1)
-    return { id: "unknown", label: "Категория не определена", domain: "unknown" } as const;
+    return { id: "unknown", label: "Kategorie unbekannt", domain: "unknown" } as const;
   return { id: matches[0].id, label: matches[0].label, domain: matches[0].domain };
 }
 const foodQueries = new Set(

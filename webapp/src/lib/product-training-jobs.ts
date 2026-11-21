@@ -27,9 +27,9 @@ export function trainingConfigured(token: string | undefined, database: string |
   return Boolean(database?.trim() && token && token.length >= 24);
 }
 export function authorizeTraining(provided: string, expected: string | undefined) {
-  if (!expected || expected.length < 24) throw new Error("Обучение не настроено на сервере");
+  if (!expected || expected.length < 24) throw new Error("Das Training ist auf dem Server nicht eingerichtet");
   const hash = (value: string) => createHash("sha256").update(value).digest();
-  if (!timingSafeEqual(hash(provided), hash(expected))) throw new Error("Неверный ключ владельца");
+  if (!timingSafeEqual(hash(provided), hash(expected))) throw new Error("Ungültiger Inhaberschlüssel");
 }
 export async function latestTrainingJob(sql: ArchiveSql): Promise<TrainingJob | null> {
   const [job] = await sql.query<TrainingJob>(
@@ -54,14 +54,14 @@ export async function createTrainingJob(
 }
 export async function recoverTrainingJobs(sql: ArchiveSql) {
   await sql.query(`update product_training_jobs set status='failed',stage='finished',
-    error='Обучение прервано. Запустите его повторно.',finished_at=now(),updated_at=now()
+    error='Das Training wurde unterbrochen. Starten Sie es erneut.',finished_at=now(),updated_at=now()
     where status in ('queued','running') and updated_at < now()-interval '90 seconds'
       and pg_try_advisory_xact_lock(${TRAINING_LOCK})`);
 }
 export async function failTrainingJob(sql: ArchiveSql, id: string) {
   await sql.query(
     `update product_training_jobs set status='failed',stage='finished',
-    error='Не удалось завершить обучение. Подробности в журнале контейнера.',
+    error='Das Training konnte nicht abgeschlossen werden. Details stehen im Containerprotokoll.',
     updated_at=now(),finished_at=now() where id=$1 and status in ('queued','running')`,
     [id],
   );

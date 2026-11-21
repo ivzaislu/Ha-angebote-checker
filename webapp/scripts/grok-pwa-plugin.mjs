@@ -68,7 +68,7 @@ function serveGrokPwa(middlewares) {
       } catch (err) {
         console.error("[app-builder] install page missing:", err);
         res.statusCode = 500;
-        res.end("install page unavailable");
+        res.end("Die Installationsseite ist nicht verfügbar");
       }
       return;
     }

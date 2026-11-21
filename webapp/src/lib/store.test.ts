@@ -39,6 +39,17 @@ test("HTTP clients can migrate old lists, add/remove products and create lists w
     state = useAngebote.getState();
     assert.equal(state.lists.find(list=>list.id===state.activeListId)?.items[0].name,"Joghurt");
     assert.equal(new Set(state.lists.map(list=>list.id)).size,2);
+    const oldName = "\u041f\u043e\u043a\u0443\u043f\u043a\u0438";
+    storage.setItem("angebote-v1", JSON.stringify({ version: 2, state: {
+      lists: [{id:"list-einkauf",name:oldName,items:[{id:"retained",name:"Milch"}]},
+        {id:"custom",name:oldName,items:[]}], activeListId:"list-einkauf", zip:"73431",
+    }}));
+    await useAngebote.persist.rehydrate();
+    state = useAngebote.getState();
+    assert.equal(state.lists[0].name, "Einkauf");
+    assert.equal(state.lists[0].items[0].name, "Milch");
+    assert.equal(state.lists[1].name, oldName);
+    assert.equal(state.zip, "73431");
   } finally {
     if(oldWindow) Object.defineProperty(globalThis,"window",oldWindow);
     else Reflect.deleteProperty(globalThis,"window");

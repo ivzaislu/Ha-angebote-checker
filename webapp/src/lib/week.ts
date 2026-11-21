@@ -19,7 +19,7 @@ export function flyerLabel(now = new Date()): string {
   const start = flyerWeekStart(now);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  const fmt = (date: Date) => date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  const fmt = (date: Date) => date.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
   return `${fmt(start)} – ${fmt(end)}`;
 }
 

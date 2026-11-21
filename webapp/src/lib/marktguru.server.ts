@@ -77,11 +77,11 @@ async function scrapeKeys(country: CountryCode): Promise<Keys> {
     headers: { "user-agent": UA },
     signal: AbortSignal.timeout(12_000),
   });
-  if (!res.ok) throw new Error("Marktguru не открывается");
+  if (!res.ok) throw new Error("Marktguru ist nicht erreichbar");
   const html = await res.text();
   const apiKey = html.match(/"apiKey"\s*:\s*"([^"]+)"/)?.[1];
   const clientKey = html.match(/"clientKey"\s*:\s*"([^"]+)"/)?.[1];
-  if (!apiKey || !clientKey) throw new Error("Ключ Marktguru не найден");
+  if (!apiKey || !clientKey) throw new Error("Marktguru-Schlüssel nicht gefunden");
   const keys = { apiKey, clientKey };
   keyCache.set(country, keys);
   return keys;
@@ -105,7 +105,7 @@ function parseOffer(
   decision: { keep: boolean; fromBrain: boolean } | null,
 ): Deal | null {
   const advertiser = entry.advertisers?.[0];
-  const retailer = advertiser?.name || entry.retailerName || "Неизвестно";
+  const retailer = advertiser?.name || entry.retailerName || "Unbekannt";
   if (
     retailers.length > 0 &&
     !retailers.some((name) => retailer.toLowerCase().includes(name.toLowerCase()))
@@ -170,7 +170,7 @@ async function fetchRaw(
   if ((res.status === 401 || res.status === 403) && !forceScrape) {
     return fetchRaw(country, zip, query, true);
   }
-  if (!res.ok) throw new Error(`Marktguru ответил ${res.status}`);
+  if (!res.ok) throw new Error(`Marktguru meldet Status ${res.status}`);
   const data = (await res.json()) as { results?: RawOffer[] };
   return data.results ?? [];
 }
@@ -235,7 +235,7 @@ export async function studyLeaflets(input: {
   country: CountryCode;
   zip: string;
 }): Promise<{ offers: number; already: boolean }> {
-  if (input.country !== "de") throw new Error("Архив листовок пока доступен только для Германии");
+  if (input.country !== "de") throw new Error("Das Prospektarchiv ist derzeit nur für Deutschland verfügbar");
   // Archive every requested region, even when the model has already studied this week.
   const status = await rememberWeek();
   try {

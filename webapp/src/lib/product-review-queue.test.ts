@@ -348,7 +348,7 @@ test("archive answers persist human labels, reject stale overwrites, and enter t
     );
     await assert.rejects(
       saveArchiveReview(sql, { ...answer, positive: false }, new Set()),
-      /другой вкладке/,
+      /anderen Tab/,
     );
     await saveArchiveReview(sql, { ...answer, positive: false, expectedPositive: true }, new Set());
     assert.equal((await readReviewedLabels(sql))[0].positive, false);
@@ -373,22 +373,22 @@ test("archive answers persist human labels, reject stale overwrites, and enter t
     assert.equal(models.count, 0, "Reviewing does not train or activate weights");
     await assert.rejects(
       saveArchiveReview(sql, { ...answer, snapshotId: "missing" }, new Set()),
-      /недоступен/,
+      /nicht geprüft/,
     );
     await assert.rejects(
       saveArchiveReview(sql, { ...answer, intent: "invented query" }, new Set()),
-      /недоступен/,
+      /nicht geprüft/,
     );
     const [at] = await sql.query<{ snapshot_id: string }>(
       "select snapshot_id from offer_archive where country='at'",
     );
     await assert.rejects(
       saveArchiveReview(sql, { ...answer, snapshotId: at.snapshot_id }, new Set()),
-      /недоступен/,
+      /nicht geprüft/,
     );
     await assert.rejects(
       saveArchiveReview(sql, answer, new Set([productGroup(labels[0])])),
-      /недоступен/,
+      /nicht geprüft/,
     );
   } finally {
     await db.close();

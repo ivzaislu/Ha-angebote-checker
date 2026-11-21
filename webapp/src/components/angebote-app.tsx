@@ -1,3 +1,4 @@
+import { formatDate, formatNumber, trainingReason, displayError } from "@/lib/locale";
 import { useEffect, useState } from "react";
 import { ProductReviewPanel } from "./product-review-panel";
 import { useServerFn } from "@tanstack/react-start";
@@ -24,7 +25,7 @@ import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/
 function formatWhen(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("ru-RU", {
+  return date.toLocaleString("de-DE", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -35,15 +36,15 @@ function formatWhen(iso: string): string {
 function VariantLabels({ name, description }: { name: string; description: string }) {
   const variant = recognizeVariant(name, description);
   const labels: Record<string, string> = {
-    salmon: "лосось", "smoked-salmon": "копчёный лосось", pollock: "сейлахс",
-    "salmon-ham": "ветчина", oat: "овсяный напиток", soy: "соевый напиток",
-    almond: "миндальный напиток", buttermilk: "пахта", uht: "длительного хранения",
-    fresh: "свежее", organic: "Bio", "lactose-free": "без лактозы",
-    vegan: "vegan", frozen: "замороженное", assorted: "разные сорта",
+    salmon: "Lachs", "smoked-salmon": "Räucherlachs", pollock: "Seelachs",
+    "salmon-ham": "Schinken", oat: "Haferdrink", soy: "Sojadrink",
+    almond: "Mandeldrink", buttermilk: "Buttermilch", uht: "ultrahocherhitzt",
+    fresh: "frisch", organic: "Bio", "lactose-free": "laktosefrei",
+    vegan: "vegan", frozen: "tiefgekühlt", assorted: "verschiedene Sorten",
   };
   const tags = [variant.kind, ...variant.attributes].filter((tag): tag is string => Boolean(tag));
   if (!tags.length) return null;
-  return <p className="mt-1 text-xs text-muted">{tags.map(tag => labels[tag] ?? (tag.startsWith("fat:") ? `жирность ${tag.slice(4)}` : tag)).join(" · ")}</p>;
+  return <p className="mt-1 text-xs text-muted">{tags.map(tag => labels[tag] ?? (tag.startsWith("fat:") ? `Fettgehalt ${tag.slice(4)}` : tag)).join(" · ")}</p>;
 }
 
 function ArchivedHistory({ name }: { name: string }) {
@@ -60,30 +61,30 @@ function ArchivedHistory({ name }: { name: string }) {
     setBusy(true);
     setError("");
     try { setData(await load({ data: { country, name } })); }
-    catch { setError("Не удалось загрузить архив цен"); }
+    catch { setError("Das Preisarchiv konnte nicht geladen werden"); }
     finally { setBusy(false); }
   }
   return <div className="mt-2 text-xs">
     <button type="button" className="underline" onClick={show} disabled={busy} aria-expanded={open}>
-      {busy ? "Загрузка архива…" : "История цен"}
+      {busy ? "Archiv wird geladen…" : "Preisverlauf"}
     </button>
     {open && <div className="mt-2 space-y-2">
-      {error && <p role="alert">{error}</p>}
-      {data && (data.observations === 0 ? <p>В архиве пока нет цен этого товара.</p> : <>
-        <p>От {data.minimum} до {data.maximum} € · наблюдений: {data.observations}</p>
-        <p className="text-muted">Сохранённые акции по стране, включая истёкшие. Фасовки и разновидности могут отличаться; это не текущая цена магазина.</p>
+      {error && <p role="alert">{displayError(error, "Die Suche ist fehlgeschlagen. Versuchen Sie es erneut.")}</p>}
+      {data && (data.observations === 0 ? <p>Für dieses Produkt sind noch keine Preise im Archiv vorhanden.</p> : <>
+        <p>Von {formatNumber(data.minimum)} bis {formatNumber(data.maximum)} € · Beobachtungen: {data.observations}</p>
+        <p className="text-muted">Gespeicherte Angebote im Land, einschließlich abgelaufener Angebote. Packungsgrößen und Varianten können abweichen. Dies ist kein aktueller Ladenpreis.</p>
         <div className="max-h-56 overflow-auto">
           <table className="w-full text-left">
-            <caption className="sr-only">Цены от минимальной до максимальной</caption>
-            <thead><tr><th>Цена</th><th>Магазин / индекс</th><th>Срок / фасовка / описание</th></tr></thead>
+            <caption className="sr-only">Preise vom niedrigsten bis zum höchsten</caption>
+            <thead><tr><th>Preis</th><th>Geschäft / PLZ</th><th>Zeitraum / Packung / Beschreibung</th></tr></thead>
             <tbody>{data.rows.map(row => <tr key={row.snapshot_id}>
-              <td className="py-1 pr-2">{row.price} €{row.unit_price ? ` · ${row.unit_price} €/${row.unit}` : ""}</td>
-              <td className="pr-2">{row.retailer || "Неизвестно"} · {row.zip}</td>
-              <td>{row.valid_from.slice(0,10) || "?"} – {row.valid_to.slice(0,10) || "?"}{row.quantity ? ` · ${row.quantity} ${row.unit}` : ""}<p>{row.description}</p></td>
+              <td className="py-1 pr-2">{formatNumber(row.price)} €{row.unit_price ? ` · ${formatNumber(row.unit_price)} €/${row.unit}` : ""}</td>
+              <td className="pr-2">{row.retailer || "Unbekannt"} · {row.zip}</td>
+              <td>{formatDate(row.valid_from)} – {formatDate(row.valid_to)}{row.quantity ? ` · ${row.quantity} ${row.unit}` : ""}<p>{row.description}</p></td>
             </tr>)}</tbody>
           </table>
         </div>
-        {data.truncated && <p>Показаны первые 500 записей. Диапазон учитывает весь архив.</p>}
+        {data.truncated && <p>Die ersten 500 Einträge werden angezeigt. Die Preisspanne berücksichtigt das gesamte Archiv.</p>}
       </>)}
     </div>}
   </div>;
@@ -93,9 +94,9 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
   const [broken, setBroken] = useState(false);
   const dates =
     deal.validFrom && deal.validTo
-      ? `${deal.validFrom} – ${deal.validTo}`
+      ? `${formatDate(deal.validFrom)} – ${formatDate(deal.validTo)}`
       : deal.validTo
-        ? `до ${deal.validTo}`
+        ? `bis ${formatDate(deal.validTo)}`
         : "";
 
   return (
@@ -120,7 +121,7 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
           </p>
           {cheapest ? (
             <span className="shrink-0 bg-ink px-1.5 py-0.5 text-xs font-medium text-paper">
-              дешевле
+              günstigstes Angebot
             </span>
           ) : null}
         </div>
@@ -142,10 +143,10 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
               {dates}
             </span>
           ) : null}
-          {deal.onlineOnly ? <span>только онлайн</span> : null}
-          {deal.fromArchive ? <span>из сохранённых акций</span> : null}
-          {deal.fromBrain ? <span>проверено нейросетью</span> : null}
-          {deal.relevance < 50 && !deal.fromBrain ? <span>похожее</span> : null}
+          {deal.onlineOnly ? <span>nur online</span> : null}
+          {deal.fromArchive ? <span>aus gespeicherten Angeboten</span> : null}
+          {deal.fromBrain ? <span>vom neuronalen Netz geprüft</span> : null}
+          {deal.relevance < 50 && !deal.fromBrain ? <span>ähnlich</span> : null}
         </p>
       </div>
     </article>
@@ -182,34 +183,34 @@ function ItemResults({
       <header className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="font-display text-2xl text-ink">{item}</h3>
         <p className="shrink-0 text-sm text-muted">
-          {error ? "ошибка" : !known ? "" : deals.length === 0 ? "нет акций" : `${deals.length}`}
+          {error ? "Fehler" : !known ? "" : deals.length === 0 ? "keine Angebote" : `${deals.length}`}
         </p>
       </header>
       {rule ? (
         <p className="mb-2 text-xs text-muted">
-          Ищем {rule.means}. Не {rule.not.join(", ")}.
+          Suche nach {rule.means}. Ausgeschlossen: {rule.not.join(", ")}.
         </p>
       ) : null}
       {assortment.length > 0 ? (
         <p className="mb-2 text-sm text-ink">
-          {fresh ? "На этой неделе" : "На прошлой неделе"}: {assortment.join(", ")}
+          {fresh ? "Diese Woche" : "Letzte Woche"}: {assortment.join(", ")}
         </p>
       ) : null}
-      {error ? <p className="text-sm text-stamp">{error}</p> : null}
+      {error ? <p className="text-sm text-stamp">{displayError(error, "Die Suche ist fehlgeschlagen. Versuchen Sie es erneut.")}</p> : null}
       {!error && known && deals.length === 0 ? (
         <p className="text-sm text-muted">
           {!fresh
-            ? "На эту неделю список ещё не обновляли."
+            ? "Die Liste wurde für diese Woche noch nicht aktualisiert."
             : dropped > 0
-              ? "В проспектах всплыло похожее, но это другой товар. Такие строки скрыты."
-              : "В текущих проспектах по этому индексу ничего не нашлось."}
+              ? "Die Prospekte enthalten ähnliche, aber andere Produkte. Diese Treffer werden ausgeblendet."
+              : "In den aktuellen Prospekten für diese PLZ wurde nichts gefunden."}
         </p>
       ) : null}
       {dropped > 0 && deals.length > 0 ? (
-        <p className="mb-2 text-xs text-muted">Скрыто похожих, но других товаров: {dropped}</p>
+        <p className="mb-2 text-xs text-muted">Ausgeblendete ähnliche, aber andere Produkte: {dropped}</p>
       ) : null}
       {!known ? (
-        <p className="text-sm text-muted">{scanning ? "Проверяем…" : "Ещё не проверяли"}</p>
+        <p className="text-sm text-muted">{scanning ? "Wird geprüft…" : "Noch nicht geprüft"}</p>
       ) : null}
       <div className="grid gap-2">
         {visible.map((deal) => (
@@ -222,7 +223,7 @@ function ItemResults({
           className="mt-2 text-sm font-medium text-ink underline decoration-line underline-offset-4"
           onClick={() => setOpen((value) => !value)}
         >
-          {open ? "Скрыть слабые совпадения" : `Ещё ${rest.length}`}
+          {open ? "Schwache Treffer ausblenden" : `Weitere ${rest.length}`}
         </button>
       ) : null}
     </section>
@@ -298,7 +299,7 @@ export function AngeboteApp() {
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
     void modelStatus().then(setNeural).catch(()=>undefined);
-    void trainingStatus().then(setTraining).catch(() => setTrainingError("Не удалось получить состояние обучения"));
+    void trainingStatus().then(setTraining).catch(() => setTrainingError("Der Trainingsstatus konnte nicht geladen werden"));
   }, []);
 
   useEffect(() => {
@@ -313,7 +314,7 @@ export function AngeboteApp() {
           setNeural(model);
         }
         if (!cancelled) {setTraining(status);setTrainingError("");}
-      }).catch(() => { if (!cancelled) setTrainingError("Связь прервана; повторяем проверку состояния обучения…"); });
+      }).catch(() => { if (!cancelled) setTrainingError("Verbindung unterbrochen. Der Trainingsstatus wird erneut abgefragt…"); });
     }, 3000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [trainingBusy]);
@@ -324,7 +325,7 @@ export function AngeboteApp() {
     try {
       setTraining(await startTraining({ data: { key: trainingKey } }));
     } catch (error) {
-      setTrainingError(error instanceof Error ? error.message : "Не удалось запустить обучение");
+      setTrainingError(displayError(error, "Das Training konnte nicht gestartet werden"));
     } finally { setStartingTraining(false); }
   }
 
@@ -380,7 +381,7 @@ export function AngeboteApp() {
 
   function onAdd(name: string) {
     const ok = addItem(name);
-    setNote(ok ? "" : "Уже в списке");
+    setNote(ok ? "" : "Bereits auf der Liste");
     if (ok) setDraft("");
   }
 
@@ -390,9 +391,9 @@ export function AngeboteApp() {
     setNote("");
     try {
       await study({data:{country,zip}});
-      setNote("Листовки обновлены. Нажмите «Найти акции».");
+      setNote("Prospekte aktualisiert. Klicken Sie auf „Angebote finden“.");
     } catch (error) {
-      setNote(error instanceof Error ? error.message : "Не удалось обновить листовки");
+      setNote(displayError(error, "Prospekte konnten nicht aktualisiert werden"));
     } finally {
       setUpdatingLeaflets(false);
     }
@@ -423,7 +424,7 @@ export function AngeboteApp() {
             });
           } catch (err) {
             byItem[item.name] = [];
-            errors[item.name] = err instanceof Error ? err.message : "Не удалось проверить";
+            errors[item.name] = displayError(err, "Prüfung fehlgeschlagen");
           } finally {
             done += 1;
             setProgress(`${done} / ${total}`);
@@ -461,12 +462,12 @@ export function AngeboteApp() {
       <div className="h-1 bg-stamp" />
       <header className="mx-auto flex max-w-6xl items-end justify-between gap-4 px-4 pt-6 pb-4 sm:px-6">
         <div>
-          <p className="text-xs font-medium tracking-[0.22em] text-muted uppercase">Проспекты</p>
+          <p className="text-xs font-medium tracking-[0.22em] text-muted uppercase">Prospekte</p>
           <h1 className="font-display text-4xl leading-none sm:text-5xl">Angebote</h1>
         </div>
         <p className="hidden text-right text-sm text-muted sm:block">
-          Список покупок сверяется
-          <br />с акциями у дома
+          Ihre Einkaufsliste vergleichen
+          <br />mit Angeboten in Ihrer Nähe
         </p>
       </header>
 
@@ -490,7 +491,7 @@ export function AngeboteApp() {
           </div>
 
           <label className="mt-4 block text-sm text-muted" htmlFor="zip">
-            Индекс
+            Postleitzahl
           </label>
           <div className="mt-1 flex items-center gap-2 border border-line bg-paper px-3">
             <MapPin className="size-4 shrink-0 text-muted" aria-hidden="true" />
@@ -506,7 +507,7 @@ export function AngeboteApp() {
             />
           </div>
           {!zipValid && zip.length > 0 ? (
-            <p className="mt-1 text-sm text-stamp">Нужно {catalog.zipLength} цифр</p>
+            <p className="mt-1 text-sm text-stamp">Erforderlich: {catalog.zipLength} Ziffern</p>
           ) : null}
 
           <form
@@ -519,7 +520,7 @@ export function AngeboteApp() {
             }}
           >
             <label className="text-sm text-muted" htmlFor="item">
-              Что искать в акциях
+              Produkte in Angeboten suchen
             </label>
             <div className="mt-1 flex gap-2">
               <input
@@ -554,7 +555,7 @@ export function AngeboteApp() {
               <button
                 type="submit"
                 className="grid size-11 shrink-0 place-items-center bg-stamp text-stamp-ink"
-                aria-label="Добавить"
+                aria-label="Hinzufügen"
               >
                 <Plus className="size-5" />
               </button>
@@ -589,7 +590,7 @@ export function AngeboteApp() {
                         <span className="text-muted">{name.slice(head)}</span>
                         {hint.fromFlyer ? (
                           <span className="ml-auto pl-3 text-xs text-muted">
-                            из листовок{hint.seen > 1 ? ` · ${hint.seen}` : ""}
+                            aus Prospekten{hint.seen > 1 ? ` · ${hint.seen}` : ""}
                           </span>
                         ) : null}
                       </button>
@@ -602,7 +603,7 @@ export function AngeboteApp() {
           </form>
 
           <div className="mt-4">
-            <p className="text-sm text-muted">Категории</p>
+            <p className="text-sm text-muted">Kategorien</p>
             <div className="flex gap-2 overflow-x-auto pb-1">
               <button
                 type="button"
@@ -613,7 +614,7 @@ export function AngeboteApp() {
                 }
                 onClick={clearCategories}
               >
-                Все
+                Alle
               </button>
               {CATEGORIES.map((category) => {
                 const on = categories.includes(category.id);
@@ -637,7 +638,7 @@ export function AngeboteApp() {
 
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Точные запросы</span>
+              <span>Präzise Suchanfragen</span>
               <span className="text-muted">{EXACT_QUERIES.length}</span>
             </summary>
             <ul className="divide-y divide-line border-t border-line">
@@ -654,7 +655,7 @@ export function AngeboteApp() {
                             <span className="font-medium">{rule.query}</span>
                             <span className="text-muted"> — {rule.means}</span>
                           </p>
-                          <p className="text-xs text-muted">не {rule.not.join(", ")}</p>
+                          <p className="text-xs text-muted">ausgeschlossen: {rule.not.join(", ")}</p>
                         </li>
                       ))}
                     </ul>
@@ -667,7 +668,7 @@ export function AngeboteApp() {
                     <span className="font-medium">{rule.query}</span>
                     <span className="text-muted"> — {rule.means}</span>
                   </p>
-                  <p className="text-xs text-muted">не {rule.not.join(", ")}</p>
+                  <p className="text-xs text-muted">ausgeschlossen: {rule.not.join(", ")}</p>
                 </li>
               ))}
             </ul>
@@ -675,50 +676,50 @@ export function AngeboteApp() {
 
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Нейросеть товаров</span>
+              <span>Neuronales Produktnetz</span>
               <span className="text-muted">
-                {neural?.active ? "активна · v2" : "не активирована"}
+                {neural?.active ? "aktiv · v2" : "nicht aktiviert"}
               </span>
             </summary>
             <p className="text-sm text-muted" data-testid="active-text-model">
               {neural?.active
-                ? `Версия ${neural.active.id}. Обучающих примеров: ${neural.active.trainCount}; проверочных: ${neural.active.validationCount}; контрольных: ${neural.active.testCount}. Поддерживаемых запросов: ${neural.active.supportedIntents.length}.`
-                : "Поиск использует правила. Новая нейросеть включается после отдельного обучения и проверки качества."}
+                ? `Version ${neural.active.id}. Trainingsbeispiele: ${neural.active.trainCount}; Validierungsbeispiele: ${neural.active.validationCount}; Kontrollbeispiele: ${neural.active.testCount}. Unterstützte Suchanfragen: ${neural.active.supportedIntents.length}.`
+                : "Die Suche verwendet Regeln. Ein neues neuronales Netz wird nach einem separaten Training und einer Qualitätsprüfung aktiviert."}
             </p>
             {neural?.active ? <p className="mt-2 text-xs text-muted">
-              Схема признаков: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "с группами товарных категорий" : "текст названия, категории и описания"}.
-              В подготовленном наборе: ручных меток {neural.active.sources.human ?? 0}, авторских учебных {neural.active.sources.curated ?? 0}, автоматических {neural.active.sources.rules ?? 0}.
+              Merkmalsschema: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "mit Produktkategoriegruppen" : "Text aus Name, Kategorie und Beschreibung"}.
+              Im vorbereiteten Datensatz: manuelle Bewertungen {neural.active.sources.human ?? 0}, redaktionelle Trainingsbeispiele {neural.active.sources.curated ?? 0}, automatische Bewertungen {neural.active.sources.rules ?? 0}.
             </p> : null}
             <p className="mt-2 text-xs text-muted">
-              Обучение использует накопленный архив и проверенные метки. Новая версия включается только после проверки качества. Контрольный набор авторский; его результат не означает такую же точность на всех акциях. При неопределённом ответе используются правила.
+              Das Training verwendet das gesammelte Archiv und geprüfte Bewertungen. Eine neue Version wird erst nach bestandener Qualitätsprüfung aktiviert. Der Kontrollsatz ist redaktionell erstellt. Sein Ergebnis belegt keine gleich hohe Genauigkeit bei allen Angeboten. Bei unsicheren Antworten greifen Regeln.
             </p>
             <div className="mt-3 space-y-2">
               {training?.configured ? <>
-                <label htmlFor="training-key" className="block text-sm">Ключ владельца</label>
+                <label htmlFor="training-key" className="block text-sm">Inhaberschlüssel</label>
                 <input id="training-key" type="password" autoComplete="off" value={trainingKey}
                   onChange={event => setTrainingKey(event.target.value)}
                   className="h-11 w-full rounded-md border border-line bg-transparent px-3"
-                  placeholder="Ключ для запуска обучения" />
+                  placeholder="Schlüssel zum Starten des Trainings" />
                 <button type="button" onClick={() => void beginTraining()}
                   disabled={startingTraining || trainingBusy || !trainingKey.trim()}
                   className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50">
-                  {startingTraining ? "Запускаем…" : trainingBusy ? "Обучение выполняется…" : "Обучить нейросеть"}
+                  {startingTraining ? "Wird gestartet…" : trainingBusy ? "Training läuft…" : "Neuronales Netz trainieren"}
                 </button>
-                <p className="text-xs text-muted">Страницу можно закрыть: обучение продолжится на сервере. Ключ хранится только до перезагрузки страницы.</p>
-              </> : training ? <p className="text-sm text-muted">Для кнопки обучения настройте ключ владельца TRAINING_ADMIN_TOKEN на сервере.</p> : null}
+                <p className="text-xs text-muted">Sie können die Seite schließen. Das Training läuft auf dem Server weiter. Der Schlüssel bleibt nur bis zum Neuladen der Seite gespeichert.</p>
+              </> : training ? <p className="text-sm text-muted">Richten Sie TRAINING_ADMIN_TOKEN auf dem Server ein, um das Training über die Schaltfläche zu starten.</p> : null}
               <div role="status" data-testid="training-status" className="text-sm">
                 {training?.job ? <>
-                  <p>{training.job.status === "queued" ? "Обучение в очереди…"
-                    : training.job.status === "running" ? training.job.stage === "preparing" ? "Подготовка обучающих данных…"
-                      : training.job.stage === "checking" ? "Проверка и сохранение модели…" : "Нейросеть обучается…"
-                    : training.job.status === "succeeded" ? "Обучение завершено. Модель включена."
-                    : training.job.status === "rejected" ? "Обучение завершено. Качество не прошло проверку; действующая модель сохранена."
-                    : training.job.error}</p>
+                  <p>{training.job.status === "queued" ? "Training wartet…"
+                    : training.job.status === "running" ? training.job.stage === "preparing" ? "Trainingsdaten werden vorbereitet…"
+                      : training.job.stage === "checking" ? "Modell wird geprüft und gespeichert…" : "Neuronales Netz wird trainiert…"
+                    : training.job.status === "succeeded" ? "Training abgeschlossen. Modell aktiviert."
+                    : training.job.status === "rejected" ? "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Das bisherige Modell bleibt aktiv."
+                    : "Das Training konnte nicht abgeschlossen werden. Starten Sie es erneut. Details stehen im Serverprotokoll."}</p>
                   {training.job.result ? <p className="mt-1 text-xs text-muted">
-                    Версия {training.job.result.candidate}. Обучающих примеров: {training.job.result.trainCount}; проверочных: {training.job.result.validationCount}; контрольных: {training.job.result.testCount}.
-                    {training.job.result.deployedControlAccuracy !== null ? ` Результат на авторском контроле: ${(training.job.result.deployedControlAccuracy * 100).toFixed(2)}%.` : ""}
+                    Version {training.job.result.candidate}. Trainingsbeispiele: {training.job.result.trainCount}; Validierungsbeispiele: {training.job.result.validationCount}; Kontrollbeispiele: {training.job.result.testCount}.
+                    {training.job.result.deployedControlAccuracy !== null ? ` Ergebnis auf dem redaktionellen Kontrollsatz: ${formatNumber(training.job.result.deployedControlAccuracy * 100)}%.` : ""}
                   </p> : null}
-                  {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{reason}</p>)}
+                  {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{trainingReason(reason)}</p>)}
                 </> : null}
               </div>
               {trainingError ? <p role="alert" className="text-sm">{trainingError}</p> : null}
@@ -726,38 +727,38 @@ export function AngeboteApp() {
             {training?.configured ? <ProductReviewPanel ownerKey={trainingKey}
               reviewedCount={neural?.reviewedLabels ?? 0}
               onReviewed={count=>setNeural(model=>model ? {...model,reviewedLabels:count} : model)} /> : null}
-            <p className="mt-2 text-sm text-muted">Названия из ранее накопленного словаря:</p>
+            <p className="mt-2 text-sm text-muted">Namen aus dem bisher gesammelten Wörterbuch:</p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">
                 {brain.intents.map((intent) => (
                   <li key={intent.intent} className="py-2 text-sm">
                     <p className="font-medium">{intent.intent}</p>
                     {intent.names.length > 0 ? (
-                      <p className="text-muted">в листовках: {intent.names.join(", ")}</p>
+                      <p className="text-muted">in Prospekten: {intent.names.join(", ")}</p>
                     ) : null}
                     {intent.rejected.length > 0 ? (
-                      <p className="text-muted">не это: {intent.rejected.join(", ")}</p>
+                      <p className="text-muted">ausgeschlossen: {intent.rejected.join(", ")}</p>
                     ) : null}
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="mt-2 text-sm text-muted">
-                Пока нет названий в словаре. Новые товары сохраняются при поиске и обновлении листовок.
+                Das Wörterbuch enthält noch keine Namen. Neue Produkte werden bei der Suche und beim Aktualisieren der Prospekte gespeichert.
               </p>
             )}
           </details>
 
           <div className="mt-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-muted">Списки</p>
+              <p className="text-sm text-muted">Listen</p>
               {lists.length > 1 && active ? (
                 <button
                   type="button"
                   className="h-11 px-2 text-sm text-muted"
                   onClick={() => deleteList(active.id)}
                 >
-                  Удалить
+                  Löschen
                 </button>
               ) : null}
             </div>
@@ -789,7 +790,7 @@ export function AngeboteApp() {
                   const trimmed = listDraft.trim();
                   if (!trimmed) return;
                   const ok = createList(trimmed);
-                  setListNote(ok ? "" : "Такой список уже есть");
+                  setListNote(ok ? "" : "Diese Liste existiert bereits");
                   if (ok) {
                     setListDraft("");
                     setMakingList(false);
@@ -799,12 +800,12 @@ export function AngeboteApp() {
                 <input
                   value={listDraft}
                   autoFocus
-                  placeholder="Например, Неделя"
+                  placeholder="Zum Beispiel: Woche"
                   onChange={(event) => setListDraft(event.target.value)}
                   className="h-11 min-w-0 flex-1 border border-line bg-paper px-3 text-base outline-none"
                 />
                 <button type="submit" className="h-11 shrink-0 bg-ink px-3 text-sm text-paper">
-                  Создать
+                  Erstellen
                 </button>
               </form>
             ) : (
@@ -816,7 +817,7 @@ export function AngeboteApp() {
                   setMakingList(true);
                 }}
               >
-                Новый список
+                Neue Liste
               </button>
             )}
             {listNote ? <p className="mt-1 text-sm text-stamp">{listNote}</p> : null}
@@ -839,8 +840,8 @@ export function AngeboteApp() {
 
           <details className="mt-5">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Магазины</span>
-              <span className="text-muted">{retailers.length === 0 ? "все" : retailers.length}</span>
+              <span>Geschäfte</span>
+              <span className="text-muted">{retailers.length === 0 ? "alle" : retailers.length}</span>
             </summary>
             <div className="flex flex-wrap gap-2 pb-1">
               <button
@@ -852,7 +853,7 @@ export function AngeboteApp() {
                 }
                 onClick={clearRetailers}
               >
-                Все
+                Alle
               </button>
               {catalog.retailers.map((name) => {
                 const on = retailers.includes(name);
@@ -882,7 +883,7 @@ export function AngeboteApp() {
                     <span className="block truncate">{item.name}</span>
                     {rule ? (
                       <span className="mt-0.5 block text-xs text-muted">
-                        {rule.means}. Не {rule.not.join(", ")}
+                        {rule.means}. Ausgeschlossen: {rule.not.join(", ")}
                       </span>
                     ) : cat ? (
                       <span className="mt-0.5 block text-xs text-muted">{categoryLabel(cat)}</span>
@@ -891,7 +892,7 @@ export function AngeboteApp() {
                   <button
                     type="button"
                     className="grid size-11 shrink-0 place-items-center text-muted"
-                    aria-label={`Убрать ${item.name}`}
+                    aria-label={`Entfernen ${item.name}`}
                     onClick={() => removeItem(item.id)}
                   >
                     <Trash2 className="size-4" />
@@ -901,33 +902,33 @@ export function AngeboteApp() {
             })}
           </ul>
           {ready && items.length > 0 && items.every((item) => !inCategories(item.name, categories)) ? (
-            <p className="py-4 text-sm text-muted">В этой категории в списке пусто.</p>
+            <p className="py-4 text-sm text-muted">In dieser Kategorie enthält die Liste keine Produkte.</p>
           ) : null}
           {ready && items.length === 0 ? (
             <p className="py-6 text-sm text-muted">
-              Добавьте товары, которые покупаете регулярно. Приложение спросит Marktguru, нет ли их сейчас в проспекте.
+              Fügen Sie Produkte hinzu, die Sie regelmäßig kaufen. Die App prüft bei Marktguru, ob sie aktuell im Prospekt angeboten werden.
             </p>
           ) : null}
         </section>
 
         <section className="min-w-0">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-display text-3xl">{fresh || !lastScan ? "Сейчас в акциях" : "Прошлая неделя"}</h2>
+            <h2 className="font-display text-3xl">{fresh || !lastScan ? "Aktuelle Angebote" : "Letzte Woche"}</h2>
             <p className="text-sm text-muted">
-              {lastScan ? `${hits} · ${formatWhen(lastScan.at)}` : ready ? "ещё не проверяли" : ""}
+              {lastScan ? `${hits} · ${formatWhen(lastScan.at)}` : ready ? "noch nicht geprüft" : ""}
             </p>
           </div>
           {ready ? (
             <p className={fresh || !lastScan ? "mt-2 text-sm text-muted" : "mt-3 border border-stamp px-3 py-2 text-sm"}>
               {lastScan && !fresh
-                ? `Проспекты уже другие, сейчас ${week} Списки ниже ещё со старого ассортимента.`
-                : "Сначала ищем в сохранённых акциях вашего индекса. Если совпадений нет — запрашиваем Marktguru."}
+                ? `Die Prospekte haben gewechselt. Aktuell: ${week} Die folgenden Listen zeigen noch das bisherige Sortiment.`
+                : "Zuerst werden gespeicherte Angebote für Ihre PLZ durchsucht. Gibt es keine Treffer, wird Marktguru abgefragt."}
             </p>
           ) : null}
 
           {!lastScan && !scanning && items.length === 0 ? (
             <p className="mt-6 max-w-md text-sm text-muted">
-              Укажите индекс и список. Проверка идёт по текущим листовкам Aldi, Lidl, Rewe, Edeka и остальных сетей рядом с вами.
+              Geben Sie Ihre PLZ ein und erstellen Sie eine Liste. Geprüft werden aktuelle Prospekte von Aldi, Lidl, Rewe, Edeka und weiteren Geschäften in Ihrer Nähe.
             </p>
           ) : null}
 
@@ -966,7 +967,7 @@ export function AngeboteApp() {
             className="inline-flex h-12 flex-1 items-center justify-center gap-2 bg-stamp px-4 text-base font-medium text-stamp-ink disabled:opacity-40 sm:flex-none sm:px-8"
           >
             {scanning ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {scanning ? `Ищем ${progress}` : "Найти акции"}
+            {scanning ? `Suche nach ${progress}` : "Angebote finden"}
           </button>
           <button
             type="button"
@@ -974,17 +975,17 @@ export function AngeboteApp() {
             onClick={() => void onUpdateLeaflets()}
             className="h-12 shrink-0 border border-line px-3 text-sm disabled:opacity-40"
           >
-            {updatingLeaflets ? "Обновляем листовки…" : "Обновить листовки"}
+            {updatingLeaflets ? "Prospekte werden aktualisiert…" : "Prospekte aktualisieren"}
           </button>
           {scanning ? null : (
             <p className="hidden text-sm text-muted sm:block">
               {lists.every((list) => list.items.length === 0)
-                ? "Сначала добавьте товар"
+                ? "Fügen Sie zuerst ein Produkt hinzu"
                 : !zipValid
-                  ? "Нужен почтовый индекс"
+                  ? "Postleitzahl erforderlich"
                   : ready
-                    ? `Все списки · ${week}`
-                    : "Все списки"}
+                    ? `Alle Listen · ${week}`
+                    : "Alle Listen"}
             </p>
           )}
           {note && items.length > 0 ? (

@@ -17,7 +17,7 @@ export type LastScan = {
 const DEFAULT_LIST_ID = "list-einkauf";
 
 function blankList(): ShopList {
-  return { id: DEFAULT_LIST_ID, name: "Покупки", items: [] };
+  return { id: DEFAULT_LIST_ID, name: "Einkauf", items: [] };
 }
 
 type PersistedV1 = {
@@ -169,10 +169,18 @@ export const useAngebote = create<State>()(
         if (state.lastScan) scans[id] = state.lastScan;
         return {
           ...state,
-          lists: [{ id, name: "Покупки", items: state.items ?? [] }],
+          lists: [{ id, name: "Einkauf", items: state.items ?? [] }],
           activeListId: id,
           scans,
         } as State;
+      },
+      merge: (persisted, current) => {
+        const state = { ...current, ...(persisted as Partial<State>) };
+        // Translate only the reserved built-in default; user list names are content.
+        state.lists = state.lists.map(list =>
+          list.id === DEFAULT_LIST_ID && list.name === "\u041f\u043e\u043a\u0443\u043f\u043a\u0438"
+            ? { ...list, name: "Einkauf" } : list);
+        return state;
       },
       partialize: (state) => ({
         lists: state.lists,

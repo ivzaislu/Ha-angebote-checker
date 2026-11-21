@@ -254,7 +254,7 @@ export async function saveArchiveReview(
     !reviewable(snapshot, controls) ||
     !EXACT_QUERIES.some((rule) => rule.query === answer.intent)
   )
-    throw new Error("Этот пример недоступен для проверки. Загрузите очередь заново.");
+    throw new Error("Dieses Beispiel kann nicht geprüft werden. Laden Sie die Auswahl erneut.");
   // Reconstruct the example from immutable server data; never accept edited text,
   // a client-supplied source, or control-set labels from the browser.
   const row: ProductExample = {
@@ -287,7 +287,7 @@ export async function saveArchiveReview(
       [id],
     );
     if (!existing || existing.positive !== answer.positive)
-      throw new Error("Пример уже проверен в другой вкладке. Загрузите очередь заново.");
+      throw new Error("Dieses Beispiel wurde bereits in einem anderen Tab bewertet. Laden Sie die Auswahl erneut.");
   }
   return { id, positive: answer.positive, reviewedCount: await reviewedCount(sql) };
 }

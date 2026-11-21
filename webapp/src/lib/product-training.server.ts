@@ -19,7 +19,7 @@ export async function trainingStatus() {
 }
 export async function startTraining(key: string) {
   authorizeTraining(key, process.env.TRAINING_ADMIN_TOKEN);
-  if (!process.env.DATABASE_URL?.trim()) throw new Error("Нужна постоянная база PostgreSQL");
+  if (!process.env.DATABASE_URL?.trim()) throw new Error("Eine dauerhafte PostgreSQL-Datenbank ist erforderlich");
   const sql = await getSql();
   await recoverTrainingJobs(sql);
   const { job, created } = await createTrainingJob(sql);
@@ -50,7 +50,7 @@ export async function startTraining(key: string) {
     } catch (error) {
       await failTrainingJob(sql, job.id);
       console.error("Training worker failed to start", error);
-      throw new Error("Не удалось запустить обучение");
+      throw new Error("Das Training konnte nicht gestartet werden");
     }
   }
   return { configured: true, job };

@@ -16,14 +16,14 @@ const controlNames = new Set(
 );
 function authorize(key: string) {
   authorizeTraining(key, process.env.TRAINING_ADMIN_TOKEN);
-  if (!process.env.DATABASE_URL?.trim()) throw new Error("Нужна постоянная база PostgreSQL");
+  if (!process.env.DATABASE_URL?.trim()) throw new Error("Eine dauerhafte PostgreSQL-Datenbank ist erforderlich");
 }
 export async function reviewQueue(key: string, mode: "active" | "rejected" = "active") {
   authorize(key);
   const sql = await getSql();
   const model =
     mode === "rejected" ? await latestRejectedProductModel(sql) : await currentProductModel();
-  if (mode === "rejected" && !model) throw new Error("Отклонённых кандидатов с отчётом пока нет");
+  if (mode === "rejected" && !model) throw new Error("Es gibt noch keine abgelehnten Kandidaten mit Bericht");
   const result = await loadReviewQueue(
     sql,
     model,
