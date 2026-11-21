@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.compose.example
+*.dump
+.vision/
+__pycache__/

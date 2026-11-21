@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ProductReviewPanel } from "./product-review-panel";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CalendarRange,
@@ -14,8 +15,9 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { brainSnapshot, flyerHints, scanQuery, studyLeaflets } from "@/lib/scan";
+import { trainNeuralModel, neuralTrainingStatus, neuralModelStatus, archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import type { BrainView } from "@/lib/brain";
+import { recognizeVariant } from "@/lib/product-variants";
 import { useAngebote, type LastScan } from "@/lib/store";
 import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
 
@@ -28,6 +30,63 @@ function formatWhen(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function VariantLabels({ name, description }: { name: string; description: string }) {
+  const variant = recognizeVariant(name, description);
+  const labels: Record<string, string> = {
+    salmon: "лосось", "smoked-salmon": "копчёный лосось", pollock: "сейлахс",
+    "salmon-ham": "ветчина", oat: "овсяный напиток", soy: "соевый напиток",
+    almond: "миндальный напиток", buttermilk: "пахта", uht: "длительного хранения",
+    fresh: "свежее", organic: "Bio", "lactose-free": "без лактозы",
+    vegan: "vegan", frozen: "замороженное", assorted: "разные сорта",
+  };
+  const tags = [variant.kind, ...variant.attributes].filter((tag): tag is string => Boolean(tag));
+  if (!tags.length) return null;
+  return <p className="mt-1 text-xs text-muted">{tags.map(tag => labels[tag] ?? (tag.startsWith("fat:") ? `жирность ${tag.slice(4)}` : tag)).join(" · ")}</p>;
+}
+
+function ArchivedHistory({ name }: { name: string }) {
+  const country = useAngebote(state => state.country);
+  const load = useServerFn(archivedPriceHistory);
+  const [data, setData] = useState<Awaited<ReturnType<typeof archivedPriceHistory>> | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setData(null); setOpen(false); setError(""); }, [country, name]);
+  async function show() {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    setBusy(true);
+    setError("");
+    try { setData(await load({ data: { country, name } })); }
+    catch { setError("Не удалось загрузить архив цен"); }
+    finally { setBusy(false); }
+  }
+  return <div className="mt-2 text-xs">
+    <button type="button" className="underline" onClick={show} disabled={busy} aria-expanded={open}>
+      {busy ? "Загрузка архива…" : "История цен"}
+    </button>
+    {open && <div className="mt-2 space-y-2">
+      {error && <p role="alert">{error}</p>}
+      {data && (data.observations === 0 ? <p>В архиве пока нет цен этого товара.</p> : <>
+        <p>От {data.minimum} до {data.maximum} € · наблюдений: {data.observations}</p>
+        <p className="text-muted">Сохранённые акции по стране, включая истёкшие. Фасовки и разновидности могут отличаться; это не текущая цена магазина.</p>
+        <div className="max-h-56 overflow-auto">
+          <table className="w-full text-left">
+            <caption className="sr-only">Цены от минимальной до максимальной</caption>
+            <thead><tr><th>Цена</th><th>Магазин / индекс</th><th>Срок / фасовка / описание</th></tr></thead>
+            <tbody>{data.rows.map(row => <tr key={row.snapshot_id}>
+              <td className="py-1 pr-2">{row.price} €{row.unit_price ? ` · ${row.unit_price} €/${row.unit}` : ""}</td>
+              <td className="pr-2">{row.retailer || "Неизвестно"} · {row.zip}</td>
+              <td>{row.valid_from.slice(0,10) || "?"} – {row.valid_to.slice(0,10) || "?"}{row.quantity ? ` · ${row.quantity} ${row.unit}` : ""}<p>{row.description}</p></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {data.truncated && <p>Показаны первые 500 записей. Диапазон учитывает весь архив.</p>}
+      </>)}
+    </div>}
+  </div>;
 }
 
 function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
@@ -66,11 +125,16 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
           ) : null}
         </div>
         <p className="font-display text-3xl leading-none text-stamp">{deal.priceLabel}</p>
+        {deal.unitPrice ? (
+          <p className="text-xs text-muted">{deal.unitPrice.perUnit.toFixed(2).replace(".", ",")} € / {deal.unitPrice.unit}</p>
+        ) : null}
         <p className="mt-1 line-clamp-2 text-sm text-ink">
           {deal.productName && deal.productName !== deal.description
             ? `${deal.productName} · ${deal.description}`
             : deal.description || deal.productName}
         </p>
+        <VariantLabels name={deal.productName} description={deal.description} />
+        <ArchivedHistory name={deal.productName || deal.description} />
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {dates ? (
             <span className="inline-flex items-center gap-1">
@@ -79,7 +143,8 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
             </span>
           ) : null}
           {deal.onlineOnly ? <span>только онлайн</span> : null}
-          {deal.fromBrain ? <span>узнал по листовкам</span> : null}
+          {deal.fromArchive ? <span>из сохранённых акций</span> : null}
+          {deal.fromBrain ? <span>проверено нейросетью</span> : null}
           {deal.relevance < 50 && !deal.fromBrain ? <span>похожее</span> : null}
         </p>
       </div>
@@ -192,10 +257,21 @@ export function AngeboteApp() {
   const scan = useServerFn(scanQuery);
   const study = useServerFn(studyLeaflets);
   const hints = useServerFn(flyerHints);
+  const catalogHints = useServerFn(productHints);
   const brainOf = useServerFn(brainSnapshot);
+  const modelStatus = useServerFn(neuralModelStatus);
+  const trainingStatus = useServerFn(neuralTrainingStatus);
+  const startTraining = useServerFn(trainNeuralModel);
+  const [training, setTraining] = useState<Awaited<ReturnType<typeof neuralTrainingStatus>> | null>(null);
+  const [trainingKey, setTrainingKey] = useState("");
+  const [startingTraining, setStartingTraining] = useState(false);
+  const [trainingError, setTrainingError] = useState("");
+  const trainingBusy = training?.job?.status === "queued" || training?.job?.status === "running";
+  const [neural, setNeural] = useState<Awaited<ReturnType<typeof neuralModelStatus>> | null>(null);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [updatingLeaflets, setUpdatingLeaflets] = useState(false);
   const [progress, setProgress] = useState("");
   const [ready, setReady] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -221,7 +297,36 @@ export function AngeboteApp() {
 
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
+    void modelStatus().then(setNeural).catch(()=>undefined);
+    void trainingStatus().then(setTraining).catch(() => setTrainingError("Не удалось получить состояние обучения"));
   }, []);
+
+  useEffect(() => {
+    if (!trainingBusy) return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      void trainingStatus().then(async (status) => {
+        if (cancelled) return;
+        if (status.job?.status !== "queued" && status.job?.status !== "running") {
+          const model = await modelStatus();
+          if (cancelled) return;
+          setNeural(model);
+        }
+        if (!cancelled) {setTraining(status);setTrainingError("");}
+      }).catch(() => { if (!cancelled) setTrainingError("Связь прервана; повторяем проверку состояния обучения…"); });
+    }, 3000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [trainingBusy]);
+
+  async function beginTraining() {
+    setStartingTraining(true);
+    setTrainingError("");
+    try {
+      setTraining(await startTraining({ data: { key: trainingKey } }));
+    } catch (error) {
+      setTrainingError(error instanceof Error ? error.message : "Не удалось запустить обучение");
+    } finally { setStartingTraining(false); }
+  }
 
   useEffect(() => {
     setHighlight(0);
@@ -235,9 +340,20 @@ export function AngeboteApp() {
     }
     let cancel = false;
     const timer = setTimeout(() => {
-      void hints({ data: { prefix } })
-        .then((rows) => {
-          if (!cancel) setFlyer(rows);
+      void Promise.all([
+        catalogHints({ data: { country, prefix } }),
+        hints({ data: { prefix } }),
+      ])
+        .then(([known, learned]) => {
+          if (!cancel) {
+            const seen = new Set<string>();
+            setFlyer([...known, ...learned].filter(row => {
+              const key = row.name.toLocaleLowerCase("de");
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }).slice(0, 12));
+          }
         })
         .catch(() => {
           if (!cancel) setFlyer([]);
@@ -247,7 +363,7 @@ export function AngeboteApp() {
       cancel = true;
       clearTimeout(timer);
     };
-  }, [draft, hints]);
+  }, [draft, country, hints, catalogHints]);
 
   const listKey = lists.map((list) => list.items.map((item) => item.name).join("|")).join(";");
   useEffect(() => {
@@ -259,6 +375,7 @@ export function AngeboteApp() {
   }, [ready, listKey]);
 
   const zipValid = zipOk(country, zip);
+
   const catalog = COUNTRIES[country];
 
   function onAdd(name: string) {
@@ -267,20 +384,26 @@ export function AngeboteApp() {
     if (ok) setDraft("");
   }
 
+  async function onUpdateLeaflets() {
+    if (!zipValid || country !== "de" || updatingLeaflets) return;
+    setUpdatingLeaflets(true);
+    setNote("");
+    try {
+      await study({data:{country,zip}});
+      setNote("Листовки обновлены. Нажмите «Найти акции».");
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : "Не удалось обновить листовки");
+    } finally {
+      setUpdatingLeaflets(false);
+    }
+  }
+
   async function onScan() {
     const targets = lists.filter((list) => list.items.length > 0);
     if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
     setNote("");
-    setProgress("листовки");
-    try {
-      const studied = await study({ data: { country, zip } });
-      if (!studied.already && studied.offers > 0) {
-        setNote(`Мозг разобрал ${studied.offers} акций из листовок`);
-      }
-    } catch {
-      setNote("");
-    }
+    setProgress("");
     const total = targets.reduce((sum, list) => sum + list.items.length, 0);
     let done = 0;
 
@@ -320,7 +443,6 @@ export function AngeboteApp() {
 
   const fresh = lastScan ? isCurrentFlyer(lastScan.at) : false;
   const week = flyerLabel();
-  const anyScan = lists.some((list) => scans[list.id]);
   const visibleItems = items.filter((item) => inCategories(item.name, categories));
   const hits = lastScan
     ? visibleItems.reduce((sum, item) => {
@@ -553,15 +675,58 @@ export function AngeboteApp() {
 
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Мозг акций</span>
+              <span>Нейросеть товаров</span>
               <span className="text-muted">
-                {brain && brain.steps > 0 ? `${brain.steps} шагов` : "учится"}
+                {neural?.active ? "активна · v2" : "не активирована"}
               </span>
             </summary>
-            <p className="text-sm text-muted">
-              Нейросеть уже обучена на текущих акциях и на листовках из архива. Дальше доучивается, когда обновляете списки, в том числе на более старых проспектах, которые Marktguru ещё отдаёт. Веса не сбрасываются.
-              {brain && brain.steps > 0 ? ` Шагов ${brain.steps}, ошибка ${brain.loss.toFixed(2)}.` : ""}
+            <p className="text-sm text-muted" data-testid="active-text-model">
+              {neural?.active
+                ? `Версия ${neural.active.id}. Обучающих примеров: ${neural.active.trainCount}; проверочных: ${neural.active.validationCount}; контрольных: ${neural.active.testCount}. Поддерживаемых запросов: ${neural.active.supportedIntents.length}.`
+                : "Поиск использует правила. Новая нейросеть включается после отдельного обучения и проверки качества."}
             </p>
+            {neural?.active ? <p className="mt-2 text-xs text-muted">
+              Схема признаков: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "с группами товарных категорий" : "текст названия, категории и описания"}.
+              В подготовленном наборе: ручных меток {neural.active.sources.human ?? 0}, авторских учебных {neural.active.sources.curated ?? 0}, автоматических {neural.active.sources.rules ?? 0}.
+            </p> : null}
+            <p className="mt-2 text-xs text-muted">
+              Обучение использует накопленный архив и проверенные метки. Новая версия включается только после проверки качества. Контрольный набор авторский; его результат не означает такую же точность на всех акциях. При неопределённом ответе используются правила.
+            </p>
+            <div className="mt-3 space-y-2">
+              {training?.configured ? <>
+                <label htmlFor="training-key" className="block text-sm">Ключ владельца</label>
+                <input id="training-key" type="password" autoComplete="off" value={trainingKey}
+                  onChange={event => setTrainingKey(event.target.value)}
+                  className="h-11 w-full rounded-md border border-line bg-transparent px-3"
+                  placeholder="Ключ для запуска обучения" />
+                <button type="button" onClick={() => void beginTraining()}
+                  disabled={startingTraining || trainingBusy || !trainingKey.trim()}
+                  className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50">
+                  {startingTraining ? "Запускаем…" : trainingBusy ? "Обучение выполняется…" : "Обучить нейросеть"}
+                </button>
+                <p className="text-xs text-muted">Страницу можно закрыть: обучение продолжится на сервере. Ключ хранится только до перезагрузки страницы.</p>
+              </> : training ? <p className="text-sm text-muted">Для кнопки обучения настройте ключ владельца TRAINING_ADMIN_TOKEN на сервере.</p> : null}
+              <div role="status" data-testid="training-status" className="text-sm">
+                {training?.job ? <>
+                  <p>{training.job.status === "queued" ? "Обучение в очереди…"
+                    : training.job.status === "running" ? training.job.stage === "preparing" ? "Подготовка обучающих данных…"
+                      : training.job.stage === "checking" ? "Проверка и сохранение модели…" : "Нейросеть обучается…"
+                    : training.job.status === "succeeded" ? "Обучение завершено. Модель включена."
+                    : training.job.status === "rejected" ? "Обучение завершено. Качество не прошло проверку; действующая модель сохранена."
+                    : training.job.error}</p>
+                  {training.job.result ? <p className="mt-1 text-xs text-muted">
+                    Версия {training.job.result.candidate}. Обучающих примеров: {training.job.result.trainCount}; проверочных: {training.job.result.validationCount}; контрольных: {training.job.result.testCount}.
+                    {training.job.result.deployedControlAccuracy !== null ? ` Результат на авторском контроле: ${(training.job.result.deployedControlAccuracy * 100).toFixed(2)}%.` : ""}
+                  </p> : null}
+                  {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{reason}</p>)}
+                </> : null}
+              </div>
+              {trainingError ? <p role="alert" className="text-sm">{trainingError}</p> : null}
+            </div>
+            {training?.configured ? <ProductReviewPanel ownerKey={trainingKey}
+              reviewedCount={neural?.reviewedLabels ?? 0}
+              onReviewed={count=>setNeural(model=>model ? {...model,reviewedLabels:count} : model)} /> : null}
+            <p className="mt-2 text-sm text-muted">Названия из ранее накопленного словаря:</p>
             {brain && brain.intents.length > 0 ? (
               <ul className="mt-2 divide-y divide-line">
                 {brain.intents.map((intent) => (
@@ -578,7 +743,7 @@ export function AngeboteApp() {
               </ul>
             ) : (
               <p className="mt-2 text-sm text-muted">
-                Пока нет разобранных названий. «Обновить списки» доучит сеть на листовках этой недели и на более старых проспектах.
+                Пока нет названий в словаре. Новые товары сохраняются при поиске и обновлении листовок.
               </p>
             )}
           </details>
@@ -756,7 +921,7 @@ export function AngeboteApp() {
             <p className={fresh || !lastScan ? "mt-2 text-sm text-muted" : "mt-3 border border-stamp px-3 py-2 text-sm"}>
               {lastScan && !fresh
                 ? `Проспекты уже другие, сейчас ${week} Списки ниже ещё со старого ассортимента.`
-                : `Листовки этой недели: ${week} Ассортимент меняется по средам.`}
+                : "Сначала ищем в сохранённых акциях вашего индекса. Если совпадений нет — запрашиваем Marktguru."}
             </p>
           ) : null}
 
@@ -801,7 +966,15 @@ export function AngeboteApp() {
             className="inline-flex h-12 flex-1 items-center justify-center gap-2 bg-stamp px-4 text-base font-medium text-stamp-ink disabled:opacity-40 sm:flex-none sm:px-8"
           >
             {scanning ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {scanning ? `Обновляем ${progress}` : anyScan ? "Обновить списки" : "Проверить акции"}
+            {scanning ? `Ищем ${progress}` : "Найти акции"}
+          </button>
+          <button
+            type="button"
+            disabled={!zipValid || country !== "de" || updatingLeaflets}
+            onClick={() => void onUpdateLeaflets()}
+            className="h-12 shrink-0 border border-line px-3 text-sm disabled:opacity-40"
+          >
+            {updatingLeaflets ? "Обновляем листовки…" : "Обновить листовки"}
           </button>
           {scanning ? null : (
             <p className="hidden text-sm text-muted sm:block">

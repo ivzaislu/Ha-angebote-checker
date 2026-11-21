@@ -1,0 +1,41 @@
+name: Standalone app checks
+on:
+  pull_request:
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/standalone-checks.yml'
+  push:
+    branches:
+      - feature/self-learning-product-catalog
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - run: npm install --no-save --package-lock=false
+        # Existing package-lock.json is inconsistent with package.json; avoid blocking checks.
+      - name: Validate deployment scripts
+        run: bash -n ../deploy/install.sh ../deploy/update.sh
+      - run: npm run typecheck
+      # Repository-wide tests currently depend on untracked .grok skills and app-env fixtures.
+      # Run the self-contained regression suite until those fixtures are restored.
+      - name: Self-contained regression tests
+        run: >-
+          node --test scripts/browser-smoke-verdict.test.mjs
+          scripts/grok-pwa-plugin.test.mjs
+          scripts/preview.test.mjs scripts/sign-out-plan.test.mjs
+          src/lib/net.test.ts src/lib/product-knowledge.test.ts
+          src/lib/unit-price.test.ts src/lib/product-variants.test.ts src/lib/offer-archive.test.ts src/lib/corpus.test.ts src/lib/store.test.ts src/lib/offer-cache.test.ts src/lib/product-training.test.ts src/lib/product-training-jobs.test.ts src/lib/product-review-queue.test.ts
+          src/lib/app-data/app-data.test.ts
+          src/lib/app-data/readiness-schedule.test.ts
+          src/lib/auth/gate-identity.test.ts
+          src/lib/auth/sign-in-gate.test.ts
+          src/lib/preview-path-prefix.test.ts

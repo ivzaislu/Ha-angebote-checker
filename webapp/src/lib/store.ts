@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { clientId } from "./client-id.ts";
 import { persist } from "zustand/middleware";
 import type { CountryCode } from "@/lib/catalog";
 import type { Deal } from "@/lib/deals";
@@ -71,7 +72,7 @@ export const useAngebote = create<State>()(
         const trimmed = name.trim().replace(/\s+/g, " ");
         if (!trimmed) return false;
         if (get().lists.some((list) => list.name.toLowerCase() === trimmed.toLowerCase())) return false;
-        const id = crypto.randomUUID();
+        const id = clientId();
         set({
           lists: [...get().lists, { id, name: trimmed, items: [] }],
           activeListId: id,
@@ -102,7 +103,7 @@ export const useAngebote = create<State>()(
         set({
           lists: get().lists.map((list) =>
             list.id === current.id
-              ? { ...list, items: [...list.items, { id: crypto.randomUUID(), name: trimmed }] }
+              ? { ...list, items: [...list.items, { id: clientId(), name: trimmed }] }
               : list,
           ),
         });
@@ -163,7 +164,7 @@ export const useAngebote = create<State>()(
       migrate: (persisted) => {
         const state = (persisted ?? {}) as PersistedV1;
         if (state.lists && state.lists.length > 0 && state.activeListId) return state as State;
-        const id = crypto.randomUUID();
+        const id = clientId();
         const scans: Record<string, LastScan> = { ...(state.scans ?? {}) };
         if (state.lastScan) scans[id] = state.lastScan;
         return {

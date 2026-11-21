@@ -1,3 +1,7 @@
+Нейросеть v2, обучение из архива, ручные исправления и версии: [NEURAL.md](./NEURAL.md).
+
+Архив акций, история цен, сбор по регионам Германии и подготовка данных мини-ИИ: [ARCHIVE.md](./ARCHIVE.md).
+
 # Angebote — standalone app
 
 Ветка `standalone-app`. Интеграция Home Assistant в `custom_components/` не тронута.
