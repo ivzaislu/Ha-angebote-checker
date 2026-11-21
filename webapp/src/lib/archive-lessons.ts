@@ -20,6 +20,7 @@ export function parseArchiveLessons(content: string, pagesContent: string) {
   const train: ProductExample[] = [], holdout: ProductExample[] = [];
   const keys = new Set<string>(), brochures = new Map<string,string>();
   const groups = new Map<string,string>();
+  const holdoutByBrochure: Record<string,ProductExample[]> = {};
   let products = 0;
   for (const line of content.split(/\r?\n/).filter(line => line.trim())) {
     const row = JSON.parse(line), evidence = pages.get(row?.sourceUrl);
@@ -47,11 +48,12 @@ export function parseArchiveLessons(content: string, pagesContent: string) {
       if (keys.has(key)) throw new Error("Doppelte oder widersprüchliche Produktbewertung");
       keys.add(key);
       (row.partition === "train" ? train : holdout).push(example);
+      if(row.partition === "holdout") (holdoutByBrochure[evidence.brochureId]??=[]).push(example);
     }
     if (++products > 1000) throw new Error("Der Pilotlauf erlaubt höchstens 1000 Produkte");
   }
   if (!train.length || !holdout.length) throw new Error("Trainings- und zurückgehaltene Archivbeispiele sind erforderlich");
-  return {train,holdout,products,pages:pages.size,fingerprint:sha(content)};
+  return {train,holdout,products,uniqueProducts:groups.size,pages:pages.size,holdoutByBrochure,fingerprint:sha(content)};
 }
 function sha(text:string):string { return createHash("sha256").update(text).digest("hex"); }
 function hash(value:unknown):value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }

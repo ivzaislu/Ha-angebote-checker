@@ -10,7 +10,8 @@ const jsonl=(v:unknown[])=>v.map(x=>JSON.stringify(x)).join("\n");
 test("source-bound author annotations remain curated and independent brochures stay held out",()=>{
   const r=parseArchiveLessons(jsonl(rows),jsonl(pages));
   assert.equal(r.train.length,1);assert.equal(r.holdout.length,1);assert.equal(r.train[0].source,"curated");
-  assert.equal(r.products,2);
+  assert.equal(r.products,2);assert.equal(r.uniqueProducts,2);
+  assert.equal(Object.keys(r.holdoutByBrochure).length,1);
 });
 test("unreviewed OCR, changed evidence and unknown intents cannot become labels",()=>{
   for(const changed of [{annotationStatus:"unreviewed"},{ocrSha256:sha("changed")},{imageSha256:sha("changed")},{judgments:[{intent:"invented",positive:true}]}]) {

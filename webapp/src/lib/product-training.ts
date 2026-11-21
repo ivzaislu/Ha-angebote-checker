@@ -130,7 +130,8 @@ export type TrainingReport = {
 };
 export function trainProductModel(
   dataset: Dataset,
-  options: { epochs?: number; seed?: number; rate?: number; champion?: ProductModelPackage } = {},
+  options: { epochs?: number; seed?: number; rate?: number; champion?: ProductModelPackage;
+    initialization?: {id:string;net:ProductNet} } = {},
 ): { net: ProductNet; report: TrainingReport } {
   if (!dataset.train.length || !dataset.validation.length || !dataset.test.length)
     throw new Error("Train, validation and test subsets are required");
@@ -139,9 +140,13 @@ export function trainProductModel(
   const epochs = options.epochs ?? 40;
   if (!Number.isInteger(epochs) || epochs < 1 || epochs > 100)
     throw new Error("Epochs must be 1–100");
-  // Copy only compatible, qualified weights. Never reinterpret legacy features.
-  const parent = options.champion;
-  const warmStart = Boolean(parent?.report.eligible && validProductNet(parent.net) && parent.net.featureVersion === 3);
+  // Require compatible features; production continuation uses qualified active weights.
+  // Offline curriculum pretraining may provide a reference independently of its
+  // release-control score. This never grants eligibility or changes release gates.
+  if(options.initialization && (!validProductNet(options.initialization.net) || options.initialization.net.featureVersion!==3))
+    throw new Error("Pretrained initialization requires valid feature-schema-3 weights");
+  const parent = options.initialization ?? (options.champion?.report.eligible ? options.champion : undefined);
+  const warmStart = Boolean(parent && validProductNet(parent.net) && parent.net.featureVersion === 3);
   const net = warmStart ? structuredClone(parent!.net) : newProductNet(options.seed ?? 173);
   const rand = seededRandom(options.seed ?? 173);
   net.featureVersion = 3;

@@ -45,6 +45,13 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['automaticLabelsWritten'],0)
             self.assertFalse((out/'pages.jsonl').exists())
 
+    def test_manifest_limit_is_explicit_and_duplicates_are_rejected(self):
+        for urls in [[URL]*2, [URL.replace('-seite-1-',f'-seite-{i}-') for i in range(1,34)]]:
+            with tempfile.TemporaryDirectory() as temp:
+                manifest=Path(temp)/'sources.json';manifest.write_text(json.dumps({'pages':urls}))
+                with patch('angebote_archive.Fetcher.load_robots',return_value='User-agent: *\nDisallow:\n'):
+                    with self.assertRaises(ValueError):collect(Path(temp)/'run',manifest=manifest)
+
     def test_page_manifest_and_image_provenance(self):
         with tempfile.TemporaryDirectory() as temp:
             manifest=Path(temp)/'sources.json';manifest.write_text(json.dumps({'pages':[URL]}))

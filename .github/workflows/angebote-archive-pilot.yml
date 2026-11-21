@@ -2,6 +2,11 @@ name: Angebote archive pilot
 on:
   workflow_dispatch:
     inputs:
+      dataset:
+        type: choice
+        options: [expanded, pilot]
+        default: expanded
+        description: 'expanded: größere ausgewogene Partie; pilot: erster kleiner Versuch'
       mode:
         type: choice
         options: [pilot, collect]
@@ -25,13 +30,15 @@ on:
       - 'training/angebote/**'
       - 'webapp/scripts/train-archive-pilot.ts'
       - 'webapp/src/lib/archive-lessons*'
+      - 'webapp/src/lib/archive-experiment*'
 permissions:
   contents: read
 jobs:
   pilot:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
+      DATASET: ${{ inputs.dataset || 'expanded' }}
       PILOT_MODE: ${{ inputs.mode || 'pilot' }}
       ARCHIVE_URL: ${{ inputs.archive_url || 'https://angebote.com/lidl/archives' }}
       MAX_PAGES: ${{ inputs.max_pages || '2' }}
@@ -52,20 +59,26 @@ jobs:
         run: npm install --no-save --package-lock=false --no-audit --no-fund
       - name: Test evidence validation and held-out isolation
         working-directory: webapp
-        run: node --experimental-strip-types --test src/lib/archive-lessons.test.ts
+        run: node --experimental-strip-types --test src/lib/archive-experiment.test.ts src/lib/archive-lessons.test.ts
       - name: Collect historical OCR pages and source images
         run: |
+          case "$DATASET" in expanded|pilot) ;; *) exit 1 ;; esac
           if [ "$PILOT_MODE" = pilot ]; then
-            python tools/angebote_archive.py --manifest training/angebote/pilot-sources.json --out .angebote-pilot/run
+            python tools/angebote_archive.py --manifest "training/angebote/$DATASET-sources.json" --out .angebote-pilot/run
           else
             python tools/angebote_archive.py --archive-url "$ARCHIVE_URL" --max-pages "$MAX_PAGES" --out .angebote-pilot/run
           fi
       - name: Train isolated candidate and measure held-out offers
         if: env.PILOT_MODE == 'pilot'
         run: |
+          scope_args=()
+          if [ "$DATASET" = expanded ]; then
+            scope_args=(training/angebote/expanded-scope.json)
+            cp training/angebote/expanded-scope.json .angebote-pilot/run/authored-scope.json
+          fi
           node --max-old-space-size=256 --experimental-strip-types webapp/scripts/train-archive-pilot.ts \
-            .angebote-pilot/run/pages.jsonl training/angebote/pilot-annotations.jsonl .angebote-pilot/model
-          cp training/angebote/pilot-annotations.jsonl .angebote-pilot/run/annotations.jsonl
+            .angebote-pilot/run/pages.jsonl "training/angebote/$DATASET-annotations.jsonl" .angebote-pilot/model "${scope_args[@]}"
+          cp "training/angebote/$DATASET-annotations.jsonl" .angebote-pilot/run/annotations.jsonl
       - name: Record outcome
         if: always()
         run: |
@@ -82,6 +95,15 @@ jobs:
                   r = json.loads(evaluation.read_text())
                   out.write(f"Produkte: {r['products']}; Trainings-/Validierungspaare: {r['archiveTrainExamples']}; zurückgehalten: {r['archiveHoldoutExamples']}.\n\n")
                   out.write(f"Gewichte aktualisiert: {r['candidate']['learning']['weightsUpdated']}.\n\n")
+                  out.write(f"Freigabe gegen isolierte Referenz: {r['candidate']['eligible']}.\n\n")
+                  out.write(f"Archivklassen: {r['archiveClassCounts']}.\n\n")
+                  out.write(f"Unterstützte Suchanfragen: {', '.join(r['supportedIntents'])}.\n\n")
+                  for reason in r['candidate']['reasons']:
+                      out.write(f"- {reason}\n")
+                  out.write('\n')
+                  for brochure, measured in r['archiveHoldoutByBrochure'].items():
+                      before, after = measured['baseline']['all'], measured['candidate']['all']
+                      out.write(f"{brochure}: {before['tp']+before['tn']} → {after['tp']+after['tn']} von {after['count']} korrekt.\n\n")
                   for name in ['baseline', 'candidate']:
                       m = r['archiveHoldout'][name]['all']
                       out.write(f"{name}: {m['tp']+m['tn']}/{m['count']} zurückgehaltene Paare korrekt.\n\n")

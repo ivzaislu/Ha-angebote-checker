@@ -54,3 +54,56 @@ vorhanden. Eine lokale Freigabe gegen diese Referenz ist **keine** Freigabe gege
 aktive VPS-Modell. Das Artefakt wird nicht automatisch importiert oder aktiviert.
 Wenn der Ausgangsstand auf der geprüften Validierung gewinnt, wird dies ausdrücklich
 als `weightsUpdated: false` ausgewiesen; ein neuer Dateiname ist kein Lernerfolg.
+
+## Erweiterte Partie (Standard im Workflow)
+
+`expanded-sources.json` und `expanded-annotations.jsonl` erweitern den Versuch auf
+**189 unterschiedliche Produktnamen, 25 Seiten und fünf abgeschlossene Prospekte**
+von Netto, Edeka und Lidl. Produktnamen werden nicht mit Datum oder Filiale verändert,
+um Wiederholungen künstlich zu neuen Produkten zu machen. Vor der Messung wurden
+unklare Bildpositionen und redundante einfache Negativfälle entfernt. Kategorien und
+Bewertungen bleiben vom Assistenten kuratiert, nicht von Menschen bestätigte Wahrheit.
+
+- Trainings-/Validierungspool: 139 Produkte, 200 Paare (42 positive, 158 negative).
+- Zurückgehalten: 50 Produkte, 69 Paare (12 positive, 57 negative).
+- Ein neuer vollständiger Netto-Ausgabenblock wird getrennt von der zurückgehaltenen
+  Lidl-Ausgabe des ersten Piloten ausgewertet. Beide bleiben aus dem Training ausgeschlossen.
+- Die natürliche Verteilung wird offengelegt; diese Partie ist nicht exakt 50:50.
+  Die vorhandene Klassen-Gewichtung im Trainer bleibt unverändert.
+
+`expanded-scope.json` ergänzt ausschließlich für diesen isolierten Versuch 77 explizite
+redaktionelle Lernpaare und acht separat benannte Kontrollpaare für **Fisch** und **Wurst**.
+Diese zusätzlichen Fälle sind Lehrbeispiele, keine weiteren archivierten Angebote. Die
+bisherigen 512 Kontrollpaare bleiben erhalten, insgesamt werden 520 geprüft. Die Definition
+von Wurst umfasst verzehrfertigen Fleischaufschnitt; rohes Fleisch und Pizza sind ausgeschlossen.
+Fisch schließt Fischfilet und Räucherfisch ein, aber keine Fischstäbchen, Salate oder Meeresfrüchte.
+Neue Suchanfragen werden weiterhin ausschließlich mit Training und geprüfter Validierung
+für die neuronale Verwendung ausgewählt. Die Freigabeschwellen werden nicht verändert.
+
+```bash
+python3 tools/angebote_archive.py --manifest training/angebote/expanded-sources.json --out .angebote-pilot/expanded-run
+node --experimental-strip-types webapp/scripts/train-archive-pilot.ts \
+  .angebote-pilot/expanded-run/pages.jsonl training/angebote/expanded-annotations.jsonl \
+  .angebote-pilot/expanded-model training/angebote/expanded-scope.json
+```
+
+Ein explizites Manifest darf jetzt höchstens 32 Seiten enthalten; der entdeckende
+Sammelmodus bleibt auf sechs Seiten beschränkt. Der Workflow erlaubt 20 Minuten,
+lädt weiterhin seriell mit Verzögerung und bricht bei Netzwerk-/Belegfehlern ab.
+Im Workflow kann `dataset: pilot` den ursprünglichen kleinen Versuch reproduzieren.
+
+Das Offline-Weitertraining kopiert die Referenzgewichte unabhängig von deren Ergebnis
+auf dem Freigabe-Kontrollsatz. So kann die Kontrollbewertung nicht über einen Wechsel
+zwischen Neuaufbau und Weitertraining indirekt die trainierten Gewichte bestimmen.
+Diese explizite Initialisierung verleiht keine Freigabe; der Produktions-CLI verwendet
+weiterhin ausschließlich qualifizierte aktive Gewichte. `control-errors.json` hält konkrete
+Freigabefehler fest. Zusätzlich zeigen `newIntentValidation`, `supportedIntents` und
+`archiveHoldoutByBrochure`, welche neuen Anfragen tatsächlich neuronale Entscheidungen
+verwenden und wie jede zurückgehaltene Ausgabe abgeschnitten hat.
+
+Erste lokale Messung: auf dem neuen Netto-Block 49 → 53 von 56 Paaren korrekt,
+auf dem früheren Lidl-Block 11 → 12 von 13. Fisch und Wurst wurden unterstützt und
+Gewichte aktualisiert. Die Freigabe scheiterte dennoch an einem zusätzlichen falschen
+Treffer auf dem Kontrollsatz (Wurst bei rohem Schweinefilet). Das ist kein Produktionsrelease; die bestehende VPS-Version
+wird nicht ersetzt. Die Ergebnisse sind kleine, assistentenkuratierte Stichproben und
+keine unabhängige Genauigkeitsgarantie.

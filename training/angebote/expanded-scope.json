@@ -1,0 +1,691 @@
+{
+  "origin": "authored-scope-cases",
+  "definitions": {
+    "Fisch": "Fisch und Fischfilet, auch geräuchert; keine Fischsalate, Fischstäbchen oder Meeresfrüchte",
+    "Wurst": "Wurst, Würstchen und verzehrfertiger Fleischaufschnitt; kein rohes Fleisch oder Pizza"
+  },
+  "curriculum": [
+    {
+      "intent": "Fisch",
+      "name": "Lachsfilet",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Lachsportionen",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Frisches Lachsfilet",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Bio Lachs",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Lachs ohne Haut",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Lachsfilet natur",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Lachssteak",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Wildlachsfilet",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Räucherlachs",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Stremellachs",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Geräuchertes Lachsfilet",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Bio Räucherlachs",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Lachsscheiben geräuchert",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Räucherlachs natur",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Stremellachs mit Pfeffer",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Geräucherter Wildlachs",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachsfilet",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Alaska-Seelachs",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachs natur",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachsportionen",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Alaska-Seelachsfilet",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachs ohne Haut",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachsfilet tiefgekühlt",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Seelachsfilets natur",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Grobe Bratwurst",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Feine Bratwürste",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Thüringer Rostbratwurst",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Wiener Würstchen",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Bockwürste im Glas",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Fleischwurst im Ring",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Lyoner in Scheiben",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Geflügelfleischwurst",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Bierschinken in Scheiben",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Salami am Stück natur",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Pfefferbeißer",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Mettenden geräuchert",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Frische Leberwurst",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Schinkenwurst fein",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Kochschinken ohne Schwarte",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Gekochte Putenbrust in Scheiben",
+      "category": "Wurstaufschnitt",
+      "description": "Wurst oder verzehrfertiger Fleischaufschnitt",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Fischstäbchen paniert",
+      "category": "Fischstäbchen",
+      "description": "Panierte Fischstäbchen",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Garnelen geschält",
+      "category": "Meeresfrüchte",
+      "description": "Rohe Garnelen",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Thunfischsalat",
+      "category": "Fischsalate",
+      "description": "Fischsalat mit Gemüse",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Fischleuchte dekorativ",
+      "category": "Beleuchtung",
+      "description": "Leuchte in Fischform",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Pizza mit Salami",
+      "category": "Tiefkühlgerichte",
+      "description": "Salamipizza",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Croissant mit Schinken",
+      "category": "Backwaren",
+      "description": "Gefülltes Croissant",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Rohes Schweinefilet",
+      "category": "Schweinefleisch",
+      "description": "Rohes Fleisch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Hähnchenbrustfilet roh",
+      "category": "Geflügel",
+      "description": "Rohes Geflügelfleisch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Frische Vollmilch",
+      "category": "Milch",
+      "description": "Kuhmilch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Frische Vollmilch",
+      "category": "Milch",
+      "description": "Kuhmilch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Reine Buttermilch",
+      "category": "Milch",
+      "description": "Buttermilch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Reine Buttermilch",
+      "category": "Milch",
+      "description": "Buttermilch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Haferdrink",
+      "category": "Milch",
+      "description": "Pflanzlicher Haferdrink",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Haferdrink",
+      "category": "Milch",
+      "description": "Pflanzlicher Haferdrink",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Salatgurke",
+      "category": "Gemüse",
+      "description": "Frische Salatgurken",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Salatgurke",
+      "category": "Gemüse",
+      "description": "Frische Salatgurken",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Essiggurken",
+      "category": "Gemüsekonserven",
+      "description": "Eingelegte Gurken in Essig",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Essiggurken",
+      "category": "Gemüsekonserven",
+      "description": "Eingelegte Gurken in Essig",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Deutsche Markenbutter",
+      "category": "Butter",
+      "description": "Butter aus Milch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Deutsche Markenbutter",
+      "category": "Butter",
+      "description": "Butter aus Milch",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Lachsfilet",
+      "category": "Frischfisch",
+      "description": "Lachs natur",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Räucherlachs",
+      "category": "Räucherfisch",
+      "description": "Geräucherter Lachs",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Seelachsfilet",
+      "category": "Tiefkühlfisch",
+      "description": "Seelachsfilet",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Kaffeebohnen",
+      "category": "Kaffee",
+      "description": "Ganze geröstete Kaffeebohnen",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Kaffeebohnen",
+      "category": "Kaffee",
+      "description": "Ganze geröstete Kaffeebohnen",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Filterkaffee gemahlen",
+      "category": "Kaffee",
+      "description": "Gemahlener Filterkaffee",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Filterkaffee gemahlen",
+      "category": "Kaffee",
+      "description": "Gemahlener Filterkaffee",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Äpfel",
+      "category": "Obst",
+      "description": "Frische Äpfel",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Äpfel",
+      "category": "Obst",
+      "description": "Frische Äpfel",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Apfelsaft",
+      "category": "Fruchtsaft",
+      "description": "Apfelsaft aus Äpfeln",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Apfelsaft",
+      "category": "Fruchtsaft",
+      "description": "Apfelsaft aus Äpfeln",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Toilettenpapier",
+      "category": "Toilettenpapier",
+      "description": "Trockenes Toilettenpapier",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Toilettenpapier",
+      "category": "Toilettenpapier",
+      "description": "Trockenes Toilettenpapier",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Feuchtes Toilettenpapier",
+      "category": "Toilettenpapier",
+      "description": "Feuchtes Toilettenpapier",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Feuchtes Toilettenpapier",
+      "category": "Toilettenpapier",
+      "description": "Feuchtes Toilettenpapier",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Kaffeemaschine",
+      "category": "Haushalt",
+      "description": "Kein Lebensmittel",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Kaffeemaschine",
+      "category": "Haushalt",
+      "description": "Kein Lebensmittel",
+      "positive": false,
+      "source": "curated"
+    }
+  ],
+  "control": [
+    {
+      "intent": "Fisch",
+      "name": "Kabeljaufilet ohne Panade",
+      "category": "Fisch",
+      "description": "Naturbelassenes Kabeljaufilet",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Frische Forellenfilets",
+      "category": "Fisch",
+      "description": "Forellenfilet natur",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Knusprige Fischstäbchen",
+      "category": "Fischstäbchen",
+      "description": "Panierte Fischstäbchen",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Fisch",
+      "name": "Garnelen natur",
+      "category": "Meeresfrüchte",
+      "description": "Garnelen ohne Schale",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Grobe Schweinebratwurst",
+      "category": "Wurst",
+      "description": "Bratwurst aus Schweinefleisch",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Feine Geflügelfleischwurst",
+      "category": "Wurst",
+      "description": "Verzehrfertige Geflügelwurst",
+      "positive": true,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Salamipizza tiefgekühlt",
+      "category": "Tiefkühlgerichte",
+      "description": "Pizza mit Salami",
+      "positive": false,
+      "source": "curated"
+    },
+    {
+      "intent": "Wurst",
+      "name": "Schweinefilet natur",
+      "category": "Schweinefleisch",
+      "description": "Rohes Schweinefilet",
+      "positive": false,
+      "source": "curated"
+    }
+  ]
+}

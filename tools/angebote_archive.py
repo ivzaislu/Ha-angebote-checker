@@ -193,8 +193,8 @@ def collect(out, manifest=None, archive_url=None, max_pages=2):
         (out / 'robots.txt').write_text(fetcher.load_robots(), encoding='utf-8')
         if manifest:
             urls = json.loads(Path(manifest).read_text(encoding='utf-8'))['pages']
-            if not isinstance(urls, list) or not 1 <= len(urls) <= 6 or len(set(urls)) != len(urls):
-                raise ValueError('Das Manifest muss 1–6 verschiedene Seiten enthalten')
+            if not isinstance(urls, list) or not 1 <= len(urls) <= 32 or len(set(urls)) != len(urls):
+                raise ValueError('Das Manifest muss 1–32 verschiedene Seiten enthalten')
             for url in urls:
                 page_metadata(url)
         else:
