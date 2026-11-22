@@ -84,36 +84,11 @@ docker compose exec -T app node --input-type=module -e 'import pg from "pg"; con
 ```bash
 docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts collect 10115
 # Файл создаётся внутри контейнера; заберите его до пересоздания контейнера.
-docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts export /tmp/training-candidates.jsonl
-docker compose cp app:/tmp/training-candidates.jsonl ./training-candidates.jsonl
+docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts export /tmp/offer-archive.jsonl
+docker compose cp app:/tmp/offer-archive.jsonl ./offer-archive.jsonl
 ```
 
 Сбор зависит от доступности Marktguru. Подробности формата и ограничений — [ARCHIVE.md](../webapp/ARCHIVE.md).
-
-### Обучение кнопкой
-
-После применения миграции `0005_product_training_jobs.sql` кнопка находится в разделе
-«Нейросеть товаров». В `.env` задайте `TRAINING_ADMIN_TOKEN` (не менее 24 символов,
-например результат `openssl rand -hex 24`) и пересоздайте `app`. Ключ вводится в поле
-«Ключ владельца»; браузер не сохраняет его между перезагрузками страницы. Не
-публикуйте ключ в логах и переписке. При доступе по обычному HTTP ключ передаётся без
-шифрования; для постоянного доступа используйте HTTPS или SSH-туннель.
-
-Один клик запускает отдельный процесс обучения на сервере. Можно закрыть страницу:
-задание, его состояние и краткий результат хранятся в PostgreSQL. Повторные нажатия
-во время обучения возвращают то же задание. Кнопка не скачивает листовки: она читает
-до 10 000 последних немецких снимков архива и до 10 000 проверенных меток, добавляет
-авторский учебный набор, обучает и проверяет кандидата тем же механизмом, что CLI.
-Кандидат включается только после проверки качества. Отказ сохраняет действующую
-модель и показывает причины. Повторное обучение на тех же данных само по себе не
-гарантирует улучшения; автоматические метки правил остаются слабой разметкой.
-
-Одновременно работает одно задание из интерфейса. PostgreSQL advisory lock защищает
-живой worker от ошибочного восстановления. Если контейнер остановлен, незавершённое
-задание после 90 секунд без heartbeat и освобождения блокировки будет помечено как
-прерванное при следующей проверке статуса. Повторный запуск — кнопкой, автоматического
-расписания нет. Лимит одного запуска — 30 минут. CLI оставлен для оператора; не
-запускайте его параллельно с кнопкой. При ошибке смотрите `docker compose logs --tail 80 app`.
 
 ### Обновление через Compose
 
@@ -133,27 +108,16 @@ docker compose logs --tail 80 app
 При неуспешной HTTP-проверке верните прежний `APP_IMAGE` и пересоздайте приложение. Миграции базы автоматически не откатываются. Команда `docker compose down` удаляет контейнеры этой Compose-конфигурации, но внешнюю PostgreSQL не затрагивает. Не запускайте `down` для другой существующей конфигурации без проверки.
 
 
-## Suche standardmäßig mit Regeln
+## Produktsuche ohne neuronales Netz
 
-Die Produktsuche verwendet standardmäßig `PRODUCT_MATCHING_MODE=rules`. Name,
-Beschreibung, Kategorien, Ausschlüsse und bestehende Variantenregeln entscheiden
-über Treffer. Auf diesem Suchpfad werden weder Modellgewichte noch der aktive
-Modellzeiger geladen. Archivsuche, Preise, Postleitzahlen, Gültigkeit, Produktbilder,
-Listen und Preisverlauf bleiben verfügbar.
+Die Suche verwendet ausschließlich deterministische Regeln: Name, Beschreibung,
+Kategorien, Ausschlüsse und Produktvarianten. Es gibt keine Modellgewichte,
+Trainingsprozesse, Review-Oberfläche oder Inhaberschlüssel mehr. Die ehemaligen
+Einstellungen `TRAINING_ADMIN_TOKEN` und `PRODUCT_MATCHING_MODE` werden nicht mehr
+verwendet und können aus der Server-`.env` entfernt werden.
 
-Gespeicherte Modelle und manuelle Bewertungen bleiben erhalten. Auch ein erfolgreiches
-Training schaltet die Suche nicht auf neuronale Entscheidungen um. Die Oberfläche
-zeigt „gespeichert · v2“ und den tatsächlichen Suchmodus. Ältere Suchergebnisse ohne
-Moduskennung oder aus einem anderen Modus werden nicht als aktuelle Ergebnisse
-angezeigt: mit „Angebote finden“ erneut prüfen; ein Prospekt-Update ist nicht nötig.
-
-Nur ein ausdrückliches `PRODUCT_MATCHING_MODE=neural` aktiviert den experimentellen
-neuronalen Suchpfad. Fehlende oder andere Werte verwenden Regeln. Nach Änderungen
-an der Compose-Umgebung muss der App-Container neu erstellt werden, beispielsweise:
-
-```bash
-docker compose up -d --no-deps --force-recreate --wait --wait-timeout 180 app
-```
-
-Der Suchmodus verändert oder löscht keine gespeicherten Gewichte und benötigt keine
-Datenbankmigration. Die Offline-Archivversuche behalten ihre getrennten Qualitätsprüfungen.
+Unveränderte historische Migrationsdateien bleiben für bestehende Installationen
+nachvollziehbar. Bereits angelegte Modelltabellen werden nicht mehr gelesen oder
+beschrieben; dieses Update löscht keine Datenbankinhalte. Archiv, bekannte Produkte,
+Preisverlauf und Einkaufslisten bleiben erhalten. Frühere Ergebnisse ohne Regelkennung
+bitte mit „Angebote finden“ erneut prüfen; ein Prospekt-Update ist dafür nicht nötig.

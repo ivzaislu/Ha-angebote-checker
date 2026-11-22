@@ -1,10 +1,6 @@
-import { productSearchMode } from "@/lib/scan";
-import type { ProductMatchingMode } from "@/lib/product-matching";
 import { scanMatchesMode } from "@/lib/product-matching";
-import { TrainingLearningDetails } from "./training-learning-details";
-import { formatDate, formatNumber, trainingReason, displayError } from "@/lib/locale";
+import { formatDate, formatNumber, displayError } from "@/lib/locale";
 import { useEffect, useState } from "react";
-import { ProductReviewPanel } from "./product-review-panel";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CalendarRange,
@@ -20,8 +16,7 @@ import { COUNTRIES, SUGGESTIONS, zipOk, type CountryCode } from "@/lib/catalog";
 import { cheapestId, primaryDeals, type Deal } from "@/lib/deals";
 import { CATEGORIES, categoryLabel, categoryOf, dealInCategory, inCategories, productsIn, suggestProducts } from "@/lib/products";
 import { EXACT_QUERIES, exactQueryFor, offerFits } from "@/lib/exact";
-import { trainNeuralModel, neuralTrainingStatus, neuralModelStatus, archivedPriceHistory, brainSnapshot, flyerHints, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
-import type { BrainView } from "@/lib/brain";
+import { archivedPriceHistory, productHints, scanQuery, studyLeaflets } from "@/lib/scan";
 import { recognizeVariant } from "@/lib/product-variants";
 import { useAngebote, type LastScan } from "@/lib/store";
 import { assortmentNames, dealStillOn, flyerLabel, isCurrentFlyer } from "@/lib/week";
@@ -149,8 +144,7 @@ function OfferCard({ deal, cheapest }: { deal: Deal; cheapest: boolean }) {
           ) : null}
           {deal.onlineOnly ? <span>nur online</span> : null}
           {deal.fromArchive ? <span>aus gespeicherten Angeboten</span> : null}
-          {deal.fromBrain ? <span>vom neuronalen Netz geprüft</span> : null}
-          {deal.relevance < 50 && !deal.fromBrain ? <span>ähnlich</span> : null}
+          {deal.relevance < 50 ? <span>ähnlich</span> : null}
         </p>
       </div>
     </article>
@@ -261,21 +255,8 @@ export function AngeboteApp() {
 
   const scan = useServerFn(scanQuery);
   const study = useServerFn(studyLeaflets);
-  const hints = useServerFn(flyerHints);
   const catalogHints = useServerFn(productHints);
-  const brainOf = useServerFn(brainSnapshot);
-  const modelStatus = useServerFn(neuralModelStatus);
-  const searchMode = useServerFn(productSearchMode);
-  const [matchingMode, setMatchingMode] = useState<ProductMatchingMode>();
-  const trainingStatus = useServerFn(neuralTrainingStatus);
-  const startTraining = useServerFn(trainNeuralModel);
-  const [training, setTraining] = useState<Awaited<ReturnType<typeof neuralTrainingStatus>> | null>(null);
-  const [trainingKey, setTrainingKey] = useState("");
-  const [startingTraining, setStartingTraining] = useState(false);
-  const [trainingError, setTrainingError] = useState("");
-  const trainingBusy = training?.job?.status === "queued" || training?.job?.status === "running";
-  const [neural, setNeural] = useState<Awaited<ReturnType<typeof neuralModelStatus>> | null>(null);
-  const lastScan = scanMatchesMode(savedScan, matchingMode) ? savedScan : null;
+  const lastScan = scanMatchesMode(savedScan) ? savedScan : null;
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -288,7 +269,6 @@ export function AngeboteApp() {
   const [listDraft, setListDraft] = useState("");
   const [listNote, setListNote] = useState("");
   const [flyer, setFlyer] = useState<{ name: string; seen: number }[]>([]);
-  const [brain, setBrain] = useState<BrainView | null>(null);
 
   const dict = suggestProducts(draft, categories);
   const matches = [
@@ -305,37 +285,7 @@ export function AngeboteApp() {
 
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
-    void searchMode().then(setMatchingMode).catch(()=>undefined);
-    void modelStatus().then(setNeural).catch(()=>undefined);
-    void trainingStatus().then(setTraining).catch(() => setTrainingError("Der Trainingsstatus konnte nicht geladen werden"));
   }, []);
-
-  useEffect(() => {
-    if (!trainingBusy) return;
-    let cancelled = false;
-    const timer = setInterval(() => {
-      void trainingStatus().then(async (status) => {
-        if (cancelled) return;
-        if (status.job?.status !== "queued" && status.job?.status !== "running") {
-          const model = await modelStatus();
-          if (cancelled) return;
-          setNeural(model);
-        }
-        if (!cancelled) {setTraining(status);setTrainingError("");}
-      }).catch(() => { if (!cancelled) setTrainingError("Verbindung unterbrochen. Der Trainingsstatus wird erneut abgefragt…"); });
-    }, 3000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [trainingBusy]);
-
-  async function beginTraining() {
-    setStartingTraining(true);
-    setTrainingError("");
-    try {
-      setTraining(await startTraining({ data: { key: trainingKey } }));
-    } catch (error) {
-      setTrainingError(displayError(error, "Das Training konnte nicht gestartet werden"));
-    } finally { setStartingTraining(false); }
-  }
 
   useEffect(() => {
     setHighlight(0);
@@ -349,21 +299,8 @@ export function AngeboteApp() {
     }
     let cancel = false;
     const timer = setTimeout(() => {
-      void Promise.all([
-        catalogHints({ data: { country, prefix } }),
-        hints({ data: { prefix } }),
-      ])
-        .then(([known, learned]) => {
-          if (!cancel) {
-            const seen = new Set<string>();
-            setFlyer([...known, ...learned].filter(row => {
-              const key = row.name.toLocaleLowerCase("de");
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            }).slice(0, 12));
-          }
-        })
+      void catalogHints({ data: { country, prefix } })
+        .then(known => { if (!cancel) setFlyer(known); })
         .catch(() => {
           if (!cancel) setFlyer([]);
         });
@@ -372,16 +309,7 @@ export function AngeboteApp() {
       cancel = true;
       clearTimeout(timer);
     };
-  }, [draft, country, hints, catalogHints]);
-
-  const listKey = lists.map((list) => list.items.map((item) => item.name).join("|")).join(";");
-  useEffect(() => {
-    if (!ready) return;
-    const queries = lists.flatMap((list) => list.items.map((item) => item.name));
-    void brainOf({ data: { queries } })
-      .then(setBrain)
-      .catch(() => undefined);
-  }, [ready, listKey]);
+  }, [draft, country, catalogHints]);
 
   const zipValid = zipOk(country, zip);
 
@@ -411,7 +339,6 @@ export function AngeboteApp() {
     const targets = lists.filter((list) => list.items.length > 0);
     if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
-    let mode: ProductMatchingMode | undefined;
     setNote("");
     setProgress("");
     const total = targets.reduce((sum, list) => sum + list.items.length, 0);
@@ -432,8 +359,6 @@ export function AngeboteApp() {
               },
             });
             byItem[item.name] = result.deals;
-            mode = result.matchingMode;
-            setMatchingMode(mode);
           } catch (err) {
             byItem[item.name] = [];
             errors[item.name] = displayError(err, "Prüfung fehlgeschlagen");
@@ -443,15 +368,12 @@ export function AngeboteApp() {
           }
         }),
       );
-      setListScan(list.id, { matchingMode: mode, at: new Date().toISOString(), byItem, errors });
+      setListScan(list.id, { matchingMode: "rules", at: new Date().toISOString(), byItem, errors });
     }
 
     setScanning(false);
     setProgress("");
-    const queries = lists.flatMap((list) => list.items.map((item) => item.name));
-    void brainOf({ data: { queries } })
-      .then(setBrain)
-      .catch(() => undefined);
+
   }
 
   const fresh = lastScan ? isCurrentFlyer(lastScan.at) : false;
@@ -470,7 +392,7 @@ export function AngeboteApp() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-paper text-ink" data-testid="angebote-app" data-ready={ready}>
       <div className="h-1 bg-stamp" />
       <header className="mx-auto flex max-w-6xl items-end justify-between gap-4 px-4 pt-6 pb-4 sm:px-6">
         <div>
@@ -687,92 +609,11 @@ export function AngeboteApp() {
           </details>
 
           <p className="mt-4 text-sm" data-testid="search-mode">
-            {matchingMode ? matchingMode === "rules"
-              ? "Suche mit Regeln: Produktname, Beschreibung, Kategorien und Ausschlüsse."
-              : "Experimentelle neuronale Suche mit Rückfall auf Regeln."
-              : "Suchmodus wird geladen…"}
+            Suche mit Regeln: Produktname, Beschreibung, Kategorien und Ausschlüsse.
           </p>
-          {savedScan && matchingMode && !lastScan ? <p className="mt-2 text-sm" data-testid="scan-mode-changed">
+          {savedScan && !lastScan ? <p className="mt-2 text-sm" data-testid="scan-mode-changed">
             Frühere Ergebnisse bitte mit „Angebote finden“ erneut prüfen. Gespeicherte Angebote werden zuerst durchsucht; ein Prospekt-Update ist dafür nicht erforderlich.
           </p> : null}
-          <details className="mt-4">
-            <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
-              <span>Neuronales Produktnetz</span>
-              <span className="text-muted">
-                {neural?.active ? matchingMode === "neural" ? "aktiv · v2" : "gespeichert · v2" : "nicht aktiviert"}
-              </span>
-            </summary>
-            {matchingMode === "rules" ? <p className="mb-2 text-sm">
-              Die Suche verwendet ausschließlich Regeln. Gespeicherte Modelle und weiteres Training beeinflussen die Suche in diesem Modus nicht.
-            </p> : null}
-            <p className="text-sm text-muted" data-testid="active-text-model">
-              {neural?.active
-                ? `Version ${neural.active.id}. Trainingsbeispiele: ${neural.active.trainCount}; Validierungsbeispiele: ${neural.active.validationCount}; Kontrollbeispiele: ${neural.active.testCount}. Unterstützte Suchanfragen: ${neural.active.supportedIntents.length}.`
-                : "Kein neuronales Modell gespeichert. Ohne Modell verwendet die Suche Regeln."}
-            </p>
-            {neural?.active ? <p className="mt-2 text-xs text-muted">
-              Merkmalsschema: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "mit Produktkategoriegruppen" : "Text aus Name, Kategorie und Beschreibung"}.
-              Im vorbereiteten Datensatz: manuelle Bewertungen {neural.active.sources.human ?? 0}, redaktionelle Trainingsbeispiele {neural.active.sources.curated ?? 0}, automatische Bewertungen {neural.active.sources.rules ?? 0}.
-            </p> : null}
-            <p className="mt-2 text-xs text-muted">
-              Das Training verwendet das gesammelte Archiv und geprüfte Bewertungen. Eine neue Version wird erst nach bestandener Qualitätsprüfung aktiviert. Der Kontrollsatz ist redaktionell erstellt. Sein Ergebnis belegt keine gleich hohe Genauigkeit bei allen Angeboten. Bei unsicheren Antworten greifen Regeln.
-            </p>
-            <div className="mt-3 space-y-2">
-              {training?.configured ? <>
-                <label htmlFor="training-key" className="block text-sm">Inhaberschlüssel</label>
-                <input id="training-key" type="password" autoComplete="off" value={trainingKey}
-                  onChange={event => setTrainingKey(event.target.value)}
-                  className="h-11 w-full rounded-md border border-line bg-transparent px-3"
-                  placeholder="Schlüssel zum Starten des Trainings" />
-                <button type="button" onClick={() => void beginTraining()}
-                  disabled={startingTraining || trainingBusy || !trainingKey.trim()}
-                  className="h-11 rounded-md border border-line px-3 text-sm disabled:opacity-50">
-                  {startingTraining ? "Wird gestartet…" : trainingBusy ? "Training läuft…" : "Neuronales Netz trainieren"}
-                </button>
-                <p className="text-xs text-muted">Sie können die Seite schließen. Das Training läuft auf dem Server weiter. Der Schlüssel bleibt nur bis zum Neuladen der Seite gespeichert.</p>
-              </> : training ? <p className="text-sm text-muted">Richten Sie TRAINING_ADMIN_TOKEN auf dem Server ein, um das Training über die Schaltfläche zu starten.</p> : null}
-              <div role="status" data-testid="training-status" className="text-sm">
-                {training?.job ? <>
-                  <p>{training.job.status === "queued" ? "Training wartet…"
-                    : training.job.status === "running" ? training.job.stage === "preparing" ? "Trainingsdaten werden vorbereitet…"
-                      : training.job.stage === "checking" ? "Modell wird geprüft und gespeichert…" : "Neuronales Netz wird trainiert…"
-                    : training.job.status === "succeeded" ? matchingMode === "rules" ? "Training abgeschlossen. Modell gespeichert. Die Suche verwendet weiter Regeln." : "Training abgeschlossen. Modell aktiviert."
-                    : training.job.status === "rejected" ? matchingMode === "rules" ? "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Die Suche verwendet weiter Regeln." : "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Das bisherige Modell bleibt aktiv."
-                    : "Das Training konnte nicht abgeschlossen werden. Starten Sie es erneut. Details stehen im Serverprotokoll."}</p>
-                  {training.job.result ? <p className="mt-1 text-xs text-muted">
-                    Version {training.job.result.candidate}. Trainingsbeispiele: {training.job.result.trainCount}; Validierungsbeispiele: {training.job.result.validationCount}; Kontrollbeispiele: {training.job.result.testCount}.
-                    {training.job.result.deployedControlAccuracy !== null ? ` Ergebnis auf dem redaktionellen Kontrollsatz: ${formatNumber(training.job.result.deployedControlAccuracy * 100)}%.` : ""}
-                  </p> : null}
-                  <TrainingLearningDetails learning={training.job.result?.learning} />
-                  {training.job.result?.reasons.map(reason => <p className="text-xs text-muted" key={reason}>{trainingReason(reason)}</p>)}
-                </> : null}
-              </div>
-              {trainingError ? <p role="alert" className="text-sm">{trainingError}</p> : null}
-            </div>
-            {training?.configured ? <ProductReviewPanel ownerKey={trainingKey}
-              reviewedCount={neural?.reviewedLabels ?? 0}
-              onReviewed={count=>setNeural(model=>model ? {...model,reviewedLabels:count} : model)} /> : null}
-            <p className="mt-2 text-sm text-muted">Namen aus dem bisher gesammelten Wörterbuch:</p>
-            {brain && brain.intents.length > 0 ? (
-              <ul className="mt-2 divide-y divide-line">
-                {brain.intents.map((intent) => (
-                  <li key={intent.intent} className="py-2 text-sm">
-                    <p className="font-medium">{intent.intent}</p>
-                    {intent.names.length > 0 ? (
-                      <p className="text-muted">in Prospekten: {intent.names.join(", ")}</p>
-                    ) : null}
-                    {intent.rejected.length > 0 ? (
-                      <p className="text-muted">ausgeschlossen: {intent.rejected.join(", ")}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-muted">
-                Das Wörterbuch enthält noch keine Namen. Neue Produkte werden bei der Suche und beim Aktualisieren der Prospekte gespeichert.
-              </p>
-            )}
-          </details>
 
           <div className="mt-4">
             <div className="flex items-center justify-between gap-2">

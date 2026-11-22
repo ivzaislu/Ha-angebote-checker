@@ -1,5 +1,4 @@
-import { EXACT_QUERIES, exactQueryFor, hardReject, offerFits } from "./exact.ts";
-import type { Lesson } from "@/lib/brain";
+import { EXACT_QUERIES } from "./exact.ts";
 import type { ProductObservation } from "@/lib/product-knowledge.server";
 import type { ArchiveOffer } from "./offer-archive.ts";
 
@@ -40,14 +39,19 @@ async function pool<T>(items: T[], width: number, run: (item: T) => Promise<void
 }
 
 /** Bounded collection of search pages and currently discoverable grocery leaflets (first 80 entries per leaflet). */
-export async function gatherLessons(zip: string, observe?: (offers: ProductObservation[]) => Promise<void>, archive?: (offers: ArchiveOffer[]) => Promise<void>): Promise<Lesson[]> {
+export async function gatherOffers(zip: string, observe?: (offers: ProductObservation[]) => Promise<void>, archive?: (offers: ArchiveOffer[]) => Promise<void>): Promise<number> {
   const discovered: ProductObservation[] = [];
-  const lessons: Lesson[] = [];
+  const seen = new Set<string>();
+  const observeOffer = (entry: Raw) => {
+    const name = (entry.product?.name || entry.name || "").trim();
+    if (!name) return;
+    seen.add(String(entry.id ?? JSON.stringify([name, entry.retailerName, entry.description])));
+    discovered.push({name, category:entry.categories?.[0]?.name ?? "", retailer:entry.advertisers?.[0]?.name || entry.retailerName || "", offerId:entry.id,price:entry.price});
+  };
   await pool(
     EXACT_QUERIES.map((rule) => rule.query),
     4,
     async (query) => {
-      const intent = exactQueryFor(query)?.query ?? query;
       const url = new URL("https://api.marktguru.de/api/v1/offers/search");
       url.searchParams.set("as", "web");
       url.searchParams.set("limit", "40");
@@ -56,18 +60,7 @@ export async function gatherLessons(zip: string, observe?: (offers: ProductObser
       url.searchParams.set("zipCode", zip);
       const data = await getJson<{ results?: Raw[] }>(url.toString());
       if (archive) await archive(data.results ?? []);
-      for (const entry of data.results ?? []) {
-        discovered.push({ name: entry.product?.name || entry.name || "", category: entry.categories?.[0]?.name ?? "" });
-        const name = (entry.product?.name || entry.name || "").trim();
-        if (name.length < 3) continue;
-        const category = entry.categories?.[0]?.name ?? "";
-        lessons.push({
-          intent,
-          name,
-          category,
-          positive: offerFits(query, name, entry.description || "", category),
-        });
-      }
+      for (const entry of data.results ?? []) observeOffer(entry);
     },
   );
 
@@ -96,17 +89,8 @@ export async function gatherLessons(zip: string, observe?: (offers: ProductObser
   await pool([...offerIds], 6, async (id) => {
     const entry = await getJson<Raw>(`https://api.marktguru.de/api/v1/offers/${id}?as=web`);
     if (archive) await archive([{ ...entry, id: entry.id ?? id }]);
-    const name = (entry.product?.name || entry.name || "").trim();
-    if (name.length < 3) return;
-    const category = entry.categories?.[0]?.name ?? "";
-    const description = entry.description || "";
-    discovered.push({ name, category });
-    for (const rule of EXACT_QUERIES) {
-      const fits = offerFits(rule.query, name, description, category);
-      if (!fits && !hardReject(rule.query, name, description, category)) continue;
-      lessons.push({ intent: rule.query, name, category, positive: fits });
-    }
+    observeOffer({ ...entry, id:entry.id ?? id });
   });
   if (observe && discovered.length) await observe(discovered);
-  return lessons;
+  return seen.size;
 }

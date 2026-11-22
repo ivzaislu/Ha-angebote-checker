@@ -3,6 +3,9 @@ services:
   app:
     mem_limit: 384m
     environment:
+      # Retired settings must not restore removed application features.
+      PRODUCT_MATCHING_MODE: neural
+      TRAINING_ADMIN_TOKEN: retired-fixture-key-not-used
       NODE_OPTIONS: --max-old-space-size=256 --import /checks/deny-marktguru.mjs
     volumes:
       - ./deploy/deny-marktguru.mjs:/checks/deny-marktguru.mjs:ro

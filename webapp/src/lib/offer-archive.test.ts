@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { archiveOffers, archiveRecord, priceHistory, prepareTrainingData, type TrainingSource } from "./offer-archive.ts";
+import { archiveOffers, archiveRecord, priceHistory } from "./offer-archive.ts";
 import { recognizeVariant } from "./product-variants.ts";
 
 const offer = { id: 17, name: "Frische Milch", description: "Bio 1,5% Fett 1 l", price: "1,29", retailerName: "Test", validFrom: "2026-11-16", validTo: "2026-11-21" };
@@ -10,7 +10,7 @@ const offer = { id: 17, name: "Frische Milch", description: "Bio 1,5% Fett 1 l",
 test("snapshots preserve corrections, regions and countries without duplicating identical scans", async () => {
   const db = new PGlite();
   try {
-    for (const file of ["0001_offer_brain.sql", "0002_product_knowledge.sql", "0003_offer_archive.sql"]) {
+    for (const file of ["0002_product_knowledge.sql", "0003_offer_archive.sql"]) {
       await db.exec(await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8"));
     }
     const sql = { query: async <T>(text: string, params?: unknown[]): Promise<T[]> => (await db.query<T>(text,params)).rows };
@@ -59,15 +59,4 @@ test("unknown variants stay unknown and explicit milk/fish variants remain separ
   assert.equal(recognizeVariant("Seelachsfilet").family,"pollock");
   assert.equal(recognizeVariant("Lachsschinken").family,"pork");
   assert.equal(recognizeVariant("Räucherlachs").kind,"smoked-salmon");
-});
-
-test("training export deduplicates regional snapshots, preserves provenance and avoids product split leakage", () => {
-  const row: TrainingSource = { snapshot_id:"a",country:"de",offer_id:"17",name:offer.name,description:offer.description,category:"Milch",variant_key:JSON.stringify(recognizeVariant(offer.name)) };
-  const examples = prepareTrainingData([row,{...row,snapshot_id:"b"},{...row,snapshot_id:"c",description:"1 l"}]);
-  assert.ok(examples.length > 0);
-  assert.equal(new Set(examples.map(e=>e.id)).size,examples.length);
-  assert.equal(new Set(examples.map(e=>e.split)).size,1);
-  assert.ok(examples.every(e=>e.needsReview && e.labelSource === "rules-v1"));
-  assert.equal(examples[0].provenance.snapshotId,"a");
-  assert.deepEqual(prepareTrainingData([row]),prepareTrainingData([row]));
 });

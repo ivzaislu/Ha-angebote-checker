@@ -1,7 +1,7 @@
 import type { ArchiveOffer, ArchiveSql } from "./offer-archive.ts";
 import { productKey, safePrice } from "./product-knowledge.ts";
-import { exactQueryFor, offerFits } from "./exact.ts";
-import { compatibleSalmon } from "./product-variants.ts";
+import { exactQueryFor } from "./exact.ts";
+import { matchesProduct } from "./product-matching.ts";
 
 /** Compare calendar days in the offer's market, including the whole last day. */
 function marketDay(country: "de" | "at", now: Date): string {
@@ -39,7 +39,7 @@ export function currentArchivedOffer(raw: ArchiveOffer, observedAt: Date | strin
 
 export type SavedOfferQuery = { country: "de" | "at"; zip: string; query: string; retailers: string[] };
 
-export async function savedOffers(sql: ArchiveSql, input: SavedOfferQuery, now = new Date(), matcher?: (offer:ArchiveOffer)=>boolean): Promise<ArchiveOffer[]> {
+export async function savedOffers(sql: ArchiveSql, input: SavedOfferQuery, now = new Date()): Promise<ArchiveOffer[]> {
   const rule = exactQueryFor(input.query);
   const terms = [input.query, rule?.query ?? "", ...(rule?.aliases ?? []), ...(rule?.acceptCategories ?? [])].filter(Boolean);
   const patterns = [...new Set(terms.flatMap(term=>[productKey(term),term.toLocaleLowerCase("de")]))]
@@ -61,8 +61,7 @@ export async function savedOffers(sql: ArchiveSql, input: SavedOfferQuery, now =
     const name = raw.product?.name || raw.name || "";
     const retailer = raw.advertisers?.[0]?.name || raw.retailerName || "";
     if (input.retailers.length && !input.retailers.some(value=>retailer.toLocaleLowerCase("de").includes(value.toLocaleLowerCase("de")))) return [];
-    if (!compatibleSalmon(input.query,name)) return [];
-    if (matcher ? !matcher(raw) : !offerFits(input.query,name,raw.description ?? "",raw.categories?.[0]?.name ?? "")) return [];
+    if (!matchesProduct({intent:input.query,name,description:raw.description ?? "",category:raw.categories?.[0]?.name ?? ""})) return [];
     const price = safePrice(raw.price);
     return price === null ? [] : [{...raw,price}];
   });

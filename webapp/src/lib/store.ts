@@ -9,7 +9,7 @@ export type WatchItem = { id: string; name: string };
 export type ShopList = { id: string; name: string; items: WatchItem[] };
 
 export type LastScan = {
-  matchingMode?: "rules" | "neural";
+  matchingMode?: string;
   at: string;
   byItem: Record<string, Deal[]>;
   errors: Record<string, string>;

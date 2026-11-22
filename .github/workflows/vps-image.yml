@@ -10,10 +10,6 @@ on:
       - 'deploy/compose.ci.yaml'
       - 'deploy/compose-smoke.mjs'
       - 'deploy/deny-marktguru.mjs'
-      - 'deploy/legacy-model-fixture.mjs'
-      - 'deploy/training-job-smoke.mjs'
-      - 'deploy/review-smoke.mjs'
-      - 'deploy/rejected-review-fixture.mjs'
       - '.github/workflows/vps-image.yml'
   workflow_dispatch:
 permissions:
@@ -27,7 +23,6 @@ jobs:
       DATABASE_URL: postgresql://compose:compose-test-only@db:5432/angebote
       COMPOSE_FILE: compose.yaml:deploy/compose.ci.yaml
       COMPOSE_PROJECT_NAME: angebote-ci
-      TRAINING_ADMIN_TOKEN: ci-training-owner-key-test-only-73431
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -47,27 +42,14 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose up -d --wait --wait-timeout 180
-      - name: Verify archive and training preparation against PostgreSQL
+      - name: Verify archive and raw export against PostgreSQL
         run: |
           docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --experimental-strip-types --input-type=module < deploy/compose-smoke.mjs
-          docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts export /tmp/training-candidates.jsonl
-          docker compose exec -T app node -e "const fs=require('node:fs');const rows=fs.readFileSync('/tmp/training-candidates.jsonl','utf8').trim().split('\n').map(JSON.parse);if(!rows.length||rows.some(r=>!r.needsReview))process.exit(1);console.log('training export OK')"
+          docker compose exec -T app node --experimental-strip-types scripts/archive-marktguru.ts export /tmp/offer-archive.jsonl
+          docker compose exec -T app node -e "const fs=require('node:fs');const rows=fs.readFileSync('/tmp/offer-archive.jsonl','utf8').trim().split('\n').map(JSON.parse);if(!rows.length||rows.some(r=>!r.raw_payload||!r.snapshot_id||'positive' in r))process.exit(1);console.log('raw archive export OK')"
           docker compose restart app
           docker compose up -d --wait --wait-timeout 180
           docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e VERIFY_ONLY=1 app node --experimental-strip-types --input-type=module < deploy/compose-smoke.mjs
-      - name: Train and activate a qualified model against the isolated archive
-        run: |
-          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts train --activate-if-qualified
-          docker compose restart app
-          docker compose up -d --wait --wait-timeout 180
-          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts status
-      - name: Verify training job concurrency and crash recovery
-        run: docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --experimental-strip-types --input-type=module < deploy/training-job-smoke.mjs
-      - name: Recheck a legacy report without changing weights
-        run: |
-          legacy_id="$(docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --experimental-strip-types --input-type=module < deploy/legacy-model-fixture.mjs)"
-          docker compose exec -T app node --experimental-strip-types scripts/product-model.ts recheck "$legacy_id" --activate-if-qualified
-          docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e LEGACY_MODEL_ID="$legacy_id" app node --experimental-strip-types --input-type=module < deploy/legacy-model-fixture.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -79,20 +61,9 @@ jobs:
       - name: Verify interactive UI over ordinary HTTP
         working-directory: webapp
         run: npm run test:browser:http
-      - name: Verify reviewed labels entered the new training candidate
-        run: docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --input-type=module < deploy/review-smoke.mjs
-      - name: Verify failed-candidate conflicts can be reviewed without activation
+      - name: Verify retired executables are absent from the image
         run: |
-          docker compose exec -T -e COMPOSE_SMOKE_TEST=1 app node --experimental-strip-types --input-type=module < deploy/rejected-review-fixture.mjs
-          cd webapp
-          node scripts/browser-rejected-review.mjs
-          cd ..
-          docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e VERIFY_ONLY=1 app node --experimental-strip-types --input-type=module < deploy/rejected-review-fixture.mjs
-      - name: Verify explicit neural opt-in after default rules checks
-        run: |
-          PRODUCT_MATCHING_MODE=neural docker compose up -d --no-deps --force-recreate --wait --wait-timeout 180 app
-          cd webapp
-          node scripts/browser-matching-mode.mjs
+          docker compose exec -T app node -e "const fs=require('node:fs');for(const f of ['scripts/product-model.ts','scripts/product-training-worker.ts','src/lib/product-net.ts','src/lib/brain.ts'])if(fs.existsSync(f))throw Error('Retired executable packaged: '+f);console.log('Image contains archive operators, no model executables')"
       - name: Container diagnostics
         if: failure()
         run: |

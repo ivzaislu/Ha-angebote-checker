@@ -1,4 +1,4 @@
-/** Conservative category metadata, shared by training and deployed decisions. */
+/** Conservative category metadata, used by deterministic product rules. */
 const fold = (text: string) =>
   text
     .toLowerCase()
@@ -87,87 +87,4 @@ export function incompatibleCategory(intent: string, category: string) {
   if (query === "unknown" || product.domain === "unknown") return false;
   if (query !== product.domain) return true;
   return query === "nonfood" && product.id !== "paper";
-}
-/** Queue triage only: food families are not hard exclusions for composite dishes. */
-const families = {
-  dairy: [
-    "Milch",
-    "Buttermilch",
-    "Hafermilch",
-    "Butter",
-    "Käse",
-    "Milchreis",
-    "Sahne",
-    "Joghurt",
-    "Eis",
-    "Gouda",
-    "Feta",
-    "Mozzarella",
-    "Parmesan",
-    "Frischkäse",
-    "Quark",
-  ],
-  produce: ["Gurke", "Essiggurken", "Apfel", "Tomaten", "Salat", "Kartoffeln"],
-  drinks: [
-    "Apfelsaft",
-    "Wasser",
-    "Bier",
-    "Wein",
-    "Weizenbier",
-    "Rotwein",
-    "Weißwein",
-    "Kaffee",
-    "Kaffeebohnen",
-    "Filterkaffee",
-    "Tee",
-    "Kräutertee",
-    "Cola",
-  ],
-  fish: [
-    "Fisch",
-    "Lachs",
-    "Räucherlachs",
-    "Seelachs",
-    "Thunfisch",
-    "Hering",
-    "Garnelen",
-    "Fischstäbchen",
-    "Forelle",
-    "Rotbarsch",
-    "Schellfisch",
-    "Kabeljau",
-    "Dorade",
-    "Muscheln",
-  ],
-  meat: [
-    "Eier",
-    "Hähnchen",
-    "Hähnchenbrust",
-    "Pute",
-    "Hackfleisch",
-    "Rinderhack",
-    "Wurst",
-    "Leberwurst",
-    "Salami",
-    "Schinken",
-  ],
-  bakery: ["Brot", "Brötchen", "Knäckebrot"],
-  pantry: ["Reis", "Tomatenmark", "Zucker", "Nudeln", "Öl", "Olivenöl", "Pommes", "Pizza", "Müsli"],
-};
-const queryFamilies = new Map(
-  Object.entries(families).flatMap(([family, queries]) =>
-    queries.map((name) => [fold(name), family] as const),
-  ),
-);
-const adjacent = [
-  new Set(["dairy", "drinks"]),
-  new Set(["produce", "pantry"]),
-  new Set(["bakery", "pantry"]),
-  new Set(["fish", "meat"]),
-];
-export function distantReviewCategory(intent: string, category: string) {
-  const family = queryFamilies.get(fold(intent)),
-    product = productCategory(category).id;
-  if (!family || product === "unknown" || family === product) return false;
-  return !adjacent.some((pair) => pair.has(family) && pair.has(product));
 }

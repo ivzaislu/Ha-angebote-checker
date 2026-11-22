@@ -2,8 +2,6 @@ import { createHash } from "node:crypto";
 import { productKey, safePrice, validProductName } from "./product-knowledge.ts";
 import { recognizeVariant } from "./product-variants.ts";
 import { inferUnitPrice } from "./unit-price.ts";
-import { EXACT_QUERIES, hardReject, offerFits } from "./exact.ts";
-import { incompatibleCategory } from "./product-category.ts";
 
 export type ArchiveOffer = {
   id?: string | number;
@@ -82,38 +80,4 @@ export async function priceHistory(sql: ArchiveSql, country: "de" | "at", name: 
      from offer_archive where country=$1 and name_key=$2 and price is not null
      and ($3::text is null or zip=$3)`, [country,productKey(name),zip ?? null]);
   return { ...range, rows, truncated: range.observations > rows.length };
-}
-
-export type TrainingSource = {
-  snapshot_id: string; country: string; offer_id: string; name: string;
-  description: string; category: string; variant_key: string;
-};
-
-/** Weak labels are candidates for review, never claimed to be human ground truth. */
-export function prepareTrainingData(rows: TrainingSource[]) {
-  const seen = new Set<string>();
-  return rows.flatMap(row => {
-    const group = productKey(row.name);
-    // Do not expand one non-food item into every unrelated food intent. Keep
-    // three stable weak examples; prices/regions do not change this sample.
-    const categoryMismatches=EXACT_QUERIES.filter(rule=>incompatibleCategory(rule.query,row.category));
-    const sampled=new Set(categoryMismatches.map(rule=>({query:rule.query,key:hash(JSON.stringify([group,productKey(row.description),row.category,rule.query]))}))
-      .sort((a,b)=>a.key.localeCompare(b.key)).slice(0,3).map(row=>row.query));
-    const excluded=new Set(categoryMismatches.map(rule=>rule.query));
-    // Keep every occurrence of a product in the same split, including across regions.
-    const split = parseInt(hash(group).slice(0,8),16) % 10 === 0 ? "validation" : "train";
-    return EXACT_QUERIES.flatMap(rule => {
-      if(excluded.has(rule.query) && !sampled.has(rule.query))return [];
-      const positive = offerFits(rule.query,row.name,row.description,row.category);
-      const negative = hardReject(rule.query,row.name,row.description,row.category);
-      if (positive === negative) return [];
-      const id = hash(JSON.stringify([rule.query,group,productKey(row.description),row.category]));
-      if (seen.has(id)) return [];
-      seen.add(id);
-      return [{ id, schemaVersion: 1, intent: rule.query, name: row.name, description: row.description,
-        category: row.category, positive, variant: JSON.parse(row.variant_key), split,
-        labelSource: "rules-v1", needsReview: true,
-        provenance: { source: "marktguru", country: row.country, offerId: row.offer_id, snapshotId: row.snapshot_id } }];
-    });
-  });
 }

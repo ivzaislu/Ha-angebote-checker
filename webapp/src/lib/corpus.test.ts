@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gatherLessons } from "./corpus.server.ts";
+import { gatherOffers } from "./corpus.server.ts";
 import type { ArchiveOffer } from "./offer-archive.ts";
 
 test("collector archives full search and current/older leaflet offers; upstream failures are reported", async () => {
@@ -21,13 +21,13 @@ test("collector archives full search and current/older leaflet offers; upstream 
     throw new Error(`Unexpected URL ${url}`);
   };
   try {
-    const lessons = await gatherLessons("10115",undefined,async offers => { captured.push(...offers); });
-    assert.ok(lessons.length > 0);
+    const offers = await gatherOffers("10115",undefined,async offers => { captured.push(...offers); });
+    assert.equal(offers,2);
     assert.ok(captured.some(r => r.id === 42 && r.price === 2.99 && r.description === "200 g"));
     assert.ok(captured.some(r => r.id === 1 && r.validTo === "2026-11-21"));
     assert.equal(calls.filter(url=>url.includes("/leaflets/")).length,2);
     assert.equal(calls.filter(url=>url.includes("/offers/42")).length,1);
     globalThis.fetch = async () => new Response("Unavailable",{status:503});
-    await assert.rejects(gatherLessons("10115"),/503/);
+    await assert.rejects(gatherOffers("10115"),/503/);
   } finally { globalThis.fetch = original; }
 });

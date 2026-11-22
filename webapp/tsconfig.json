@@ -33,9 +33,6 @@
   "include": [
     "src",
     "server",
-    "scripts/product-model.ts",
-    "scripts/product-training-worker.ts",
-    "scripts/train-product-model.ts",
-    "scripts/train-archive-pilot.ts"
+    "scripts/archive-marktguru.ts"
   ]
 }

@@ -1,17 +1,12 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
-import { offerFits } from "@/lib/exact";
-import { learnLessons, rememberWeek, snapshotFor } from "@/lib/brain.server";
-import { gatherLessons } from "@/lib/corpus.server";
+import { gatherOffers } from "@/lib/corpus.server";
 import { rememberProducts } from "@/lib/product-knowledge.server";
 import { inferUnitPrice } from "@/lib/unit-price";
 import { archiveOffers } from "@/lib/offer-archive";
 import { getSql } from "@/lib/db";
 import { savedOffers } from "@/lib/offer-cache";
-import { searchProductModel } from "./product-matching.ts";
-import { currentProductModel } from "@/lib/product-model.server";
-import { decideProduct } from "@/lib/product-policy";
-import { compatibleSalmon } from "@/lib/product-variants";
+import { matchesProduct } from "./product-matching.ts";
 
 const UA = "Mozilla/5.0";
 
@@ -103,7 +98,7 @@ function parseOffer(
   query: string,
   retailers: string[],
   imageTemplate: string,
-  decision: { keep: boolean; fromBrain: boolean } | null,
+
 ): Deal | null {
   const advertiser = entry.advertisers?.[0];
   const retailer = advertiser?.name || entry.retailerName || "Unbekannt";
@@ -117,8 +112,8 @@ function parseOffer(
   const productName = entry.product?.name || entry.name || "";
   const description = entry.description || "";
   const category = entry.categories?.[0]?.name ?? "";
-  const keep = decision ? decision.keep : offerFits(query, productName, description, category);
-  if (!keep || !compatibleSalmon(query, productName)) return null;
+  const keep = matchesProduct({intent:query,name:productName,description,category});
+  if (!keep) return null;
   const relevance = relevanceScore(query, productName, description);
   const { label, value } = formatPrice(entry.price);
   const dates = entry.validityDates?.[0];
@@ -140,7 +135,6 @@ function parseOffer(
     relevance,
     onlineOnly: /nur online|online verfügbar/.test(blob),
     category,
-    fromBrain: decision?.fromBrain ?? false,
   };
 }
 
@@ -184,14 +178,9 @@ export async function searchDeals(input: {
 }): Promise<Deal[]> {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
-  const model = await searchProductModel(currentProductModel, process.env.PRODUCT_MATCHING_MODE).catch(error=>{console.error("product model",error);return null;});
-  const classify = (entry:RawOffer) => decideProduct(model,{
-    intent:input.query,name:entry.product?.name || entry.name || "",
-    description:entry.description || "",category:entry.categories?.[0]?.name || "",
-  });
-  const saved = await savedOffers(await getSql(), {...input,retailers},new Date(),entry=>classify(entry).keep);
+  const saved = await savedOffers(await getSql(), {...input,retailers},new Date());
   const cachedDeals = saved.flatMap(entry=>{
-    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image,classify(entry));
+    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image);
     return deal ? [{...deal,fromArchive:true}] : [];
   });
   if (cachedDeals.length) {
@@ -216,7 +205,6 @@ export async function searchDeals(input: {
       input.query,
       retailers,
       CONFIG[input.country].image,
-      classify(raw[index]),
     );
     if (!deal) continue;
     const key = `${deal.retailer}|${deal.priceLabel}|${deal.description}|${deal.productName}`;
@@ -237,16 +225,9 @@ export async function studyLeaflets(input: {
   zip: string;
 }): Promise<{ offers: number; already: boolean }> {
   if (input.country !== "de") throw new Error("Das Prospektarchiv ist derzeit nur für Deutschland verfügbar");
-  // Archive every requested region, even when the model has already studied this week.
-  const status = await rememberWeek();
-  try {
-    const lessons = await gatherLessons(input.zip, (offers) => rememberProducts(input.country, offers),
-      async (offers) => { await archiveOffers(await getSql(), "de", input.zip, offers); });
-    if (!status.already) await learnLessons(lessons);
-  } catch (err) {
-    console.error("leaflet study", err);
-    throw err;
-  }
-  const view = await snapshotFor([]);
-  return { offers: view.offers, already: status.already };
+  const sql = await getSql();
+  const offers = await gatherOffers(input.zip,
+    (offers) => rememberProducts(input.country, offers),
+    (offers) => archiveOffers(sql, "de", input.zip, offers).then(() => undefined));
+  return { offers, already: false };
 }

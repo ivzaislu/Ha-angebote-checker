@@ -1,15 +1,12 @@
-import type { ProductModelPackage } from "./product-model-store.ts";
-export type ProductMatchingMode = "rules" | "neural";
-/** Missing, misspelled and unknown settings all keep the deterministic default. */
-export function productMatchingMode(value?: string): ProductMatchingMode {
-  return value === "neural" ? "neural" : "rules";
+import { offerFits } from "./exact.ts";
+import { compatibleSalmon } from "./product-variants.ts";
+
+export type ProductText = {intent: string; name: string; description: string; category: string};
+/** Deterministic matching shared by archived and remote offers. */
+export function matchesProduct(row: ProductText): boolean {
+  return offerFits(row.intent, row.name, row.description, row.category) && compatibleSalmon(row.intent, row.name);
 }
-/** Rules search must not read model weights or the active-model pointer. */
-export async function searchProductModel(
-  load: () => Promise<ProductModelPackage | null>, value?: string,
-): Promise<ProductModelPackage | null> {
-  return productMatchingMode(value) === "neural" ? load() : null;
-}
-export function scanMatchesMode(saved: { matchingMode?: ProductMatchingMode } | null, mode?: ProductMatchingMode) {
-  return Boolean(saved && mode && saved.matchingMode === mode);
+/** Old/unidentified results need a fresh archive-first check. */
+export function scanMatchesMode(saved: {matchingMode?: string} | null) {
+  return saved?.matchingMode === "rules";
 }

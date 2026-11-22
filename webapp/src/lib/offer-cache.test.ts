@@ -12,7 +12,7 @@ const query = {country:"de" as const,zip:"73431",query:"Milch",retailers:[] as s
 test("cache reads only the latest matching current state in the requested region/country", async () => {
   const db = new PGlite();
   try {
-    for (const name of ["0001_offer_brain.sql","0002_product_knowledge.sql","0003_offer_archive.sql"]) {
+    for (const name of ["0002_product_knowledge.sql","0003_offer_archive.sql"]) {
       await db.exec(await readFile(new URL(`../../migrations/${name}`,import.meta.url),"utf8"));
     }
     const sql = {query:async <T>(text:string,params?:unknown[]):Promise<T[]> => (await db.query<T>(text,params)).rows};
