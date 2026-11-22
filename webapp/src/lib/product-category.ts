@@ -8,6 +8,8 @@ const fold = (text: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 const groups = [
+  {id:"clothing",label:"Bekleidung",domain:"nonfood",pattern:/bekleidung|damenmode|herrenmode|kinderkleidung/},
+  {id:"household",label:"Haushalt und Dekoration",domain:"nonfood",pattern:/haushaltswaren|geschirr|dekorationsartikel|spielwaren/},
   {
     id: "cosmetics",
     label: "Pflege und Kosmetik",

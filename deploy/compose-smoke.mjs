@@ -13,6 +13,17 @@ try {
     assert.equal(await archiveOffers(sql, 'de', '10115', [offer, offer]), 1);
     assert.equal(await archiveOffers(sql, 'de', '10115', [{ ...offer, price: 1.79 }]), 1);
   }
+  const ruleOffers = [
+    ['apples-hit','Knackige Tafeläpfel','Obst','Frische Äpfel',2.19],
+    ['apples-miss','Apfelstrudel','Backwaren','600 g',0.01],
+    ['juice-hit','Bio Apfel-Direktsaft naturtrüb','Fruchtsaft','1 l',2.29],
+    ['juice-miss','Apfelschorle','Softdrinks','1,5 l',0.02],
+    ['pizza-hit','Steinofenpizza Margherita','Tiefkühlgerichte','Knuspriger Teig, mit Tomatensauce',2.39],
+    ['pizza-miss','Pizzateig','Tiefkühlpizza','400 g',0.03],
+    ['coffee-hit','Barista Selection','Getränke > Kaffee','1 kg',7.49],
+    ['coffee-miss','Kaffeetassen','Kaffee','6 Stück',0.04],
+  ].map(([id,name,category,description,price])=>({id:`rule-${id}`,name,description,price,categories:[{name:category}],retailerName:'Rules fixture'}));
+  await archiveOffers(sql,'de','10115',ruleOffers);
   const history = await priceHistory(sql, 'de', offer.product.name, '10115');
   assert.equal(history.observations, 2);
   assert.equal(Number(history.minimum), 1.29);

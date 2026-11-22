@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { matchesProduct, scanMatchesMode } from "./product-matching.ts";
+import { matchesProduct, scanMatchesMode, PRODUCT_RULESET_VERSION } from "./product-matching.ts";
 
 test("rules accept product variants and reject lookalikes and incompatible categories", () => {
   const row = {intent:"Milch",name:"Vollmilch",category:"Milch",description:"1 l"};
@@ -14,6 +14,8 @@ test("rules accept product variants and reject lookalikes and incompatible categ
 test("legacy and retired-mode results require a fresh rules check",()=>{
   assert.equal(scanMatchesMode({}),false);
   assert.equal(scanMatchesMode({matchingMode:"neural"}),false);
-  assert.equal(scanMatchesMode({matchingMode:"rules"}),true);
+  assert.equal(scanMatchesMode({matchingMode:"rules"}),false);
+  assert.equal(scanMatchesMode({matchingMode:"rules",rulesVersion:PRODUCT_RULESET_VERSION}),true);
+  assert.equal(scanMatchesMode({matchingMode:"rules",rulesVersion:PRODUCT_RULESET_VERSION-1}),false);
   assert.equal(scanMatchesMode(null),false);
 });

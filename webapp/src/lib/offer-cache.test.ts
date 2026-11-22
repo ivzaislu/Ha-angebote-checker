@@ -1,3 +1,4 @@
+import { RULE_CASES } from "./exact-cases.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -49,4 +50,23 @@ test("validity handles local end-of-day, multiple windows and malformed/missing 
   assert.equal(currentArchivedOffer({},"2026-11-20T10:00:00Z","de",now),null);
   const result = currentArchivedOffer({validityDates:[{to:"2026-11-18"},{from:"2026-11-19",to:"2026-11-25"}]},fresh,"de",now);
   assert.deepEqual(result?.validityDates,[{from:"2026-11-19",to:"2026-11-25"}]);
+});
+
+
+test("all authored positive/negative rule cases survive SQL candidate selection and archive matching", async()=>{
+  const db=new PGlite();
+  try {
+    await db.exec(await readFile(new URL("../../migrations/0003_offer_archive.sql",import.meta.url),"utf8"));
+    const sql={query:async <T>(text:string,params?:unknown[]):Promise<T[]> => (await db.query<T>(text,params)).rows};
+    await archiveOffers(sql,"de","73431",RULE_CASES.map((row,i)=>({
+      id:`rule-${i}`,name:row.name,description:row.description,categories:[{name:row.category}],
+      retailerName:"Rules fixture",price:1.29,validFrom:"2026-11-16",validTo:"2026-11-22",
+    })));
+    for(const intent of new Set(RULE_CASES.map(row=>row.query))){
+      const found=new Set((await savedOffers(sql,{...query,query:intent},now)).map(row=>row.id));
+      RULE_CASES.forEach((row,i)=>{
+        if(row.query===intent)assert.equal(found.has(`rule-${i}`),row.expected,`${intent}: ${row.name} [${row.category}]`);
+      });
+    }
+  }finally{await db.close();}
 });

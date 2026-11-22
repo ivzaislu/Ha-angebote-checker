@@ -35,7 +35,8 @@ export const scanQuery = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const { searchDeals } = await import("@/lib/marktguru.server");
-    return { deals: await searchDeals(data), matchingMode: "rules" as const };
+    const {PRODUCT_RULESET_VERSION} = await import("./product-matching.ts");
+    return { deals: await searchDeals(data), matchingMode: "rules" as const, rulesVersion: PRODUCT_RULESET_VERSION };
   });
 
 export const studyLeaflets = createServerFn({ method: "POST" })

@@ -5,13 +5,17 @@ export type ExactQuery = {
   not: string[];
   acceptCategories: string[];
   aliases: string[];
+  /** Product-title variants that must not broaden a specific search query. */
+  nameAliases?: string[];
   reject: string[];
-  /** Category alone is too broad, the name has to be this product too. */
+  /** Category-only matches are disabled for this product. */
   requireName: boolean;
   /** Match Lachs inside Lachsfilet, but not as a loose substring of another food. */
   stem?: boolean;
   /** At least one of these must show up in the name or description. */
   need?: string[];
+  /** Identity words in title/category, not ingredients or serving suggestions. */
+  rejectIdentity?: string[];
 };
 
 /**
@@ -25,8 +29,9 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Buttermilch", "Hafermilch", "Milchreis", "Käse", "Joghurt", "Schokolade"],
     acceptCategories: ["milch"],
     aliases: ["vollmilch", "h-milch", "frische milch"],
-    reject: ["buttermilch", "hafermilch", "mandelmilch", "kokosmilch", "sojamilch", "kondensmilch", "milchreis", "schoko", "joghurt", "miniatur"],
-    requireName: false,
+    nameAliases: ["weidemilch", "kuhmilch"],
+    reject: ["buttermilch", "hafer", "mandel", "kokos", "soja", "yakult", "kefir", "ayran", "kondensmilch", "milchreis", "schoko", "joghurt", "miniatur"],
+    requireName: true,
   },
   {
     query: "Buttermilch",
@@ -88,6 +93,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Margarine", "Butterschmalz", "Kekse", "Buttermilch", "Butterkäse"],
     acceptCategories: ["butter"],
     aliases: [],
+    nameAliases: ["markenbutter"],
     reject: ["schmalz", "margarine", "streich", "keks", "cookie", "croissant", "zopf", "stollen", "cracker", "spritz", "buttermilch", "butterkase"],
     requireName: false,
   },
@@ -115,6 +121,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Brot", "Croissants"],
     acceptCategories: ["brotchen"],
     aliases: ["semmel", "semmeln"],
+    nameAliases: ["kaiserbrotchen"],
     reject: ["croissant", "kuchen"],
     requireName: false,
   },
@@ -133,16 +140,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Saft", "Nektar", "Strudel"],
     acceptCategories: ["apfel"],
     aliases: ["apfel"],
-    reject: ["saft", "nektar", "schorle", "smoothie", "spritz", "kuchen", "tasche", "mus"],
+    nameAliases: ["tafelapfel"],
+    reject: ["saft", "nektar", "schorle", "smoothie", "spritz", "kuchen", "strudel", "tasche", "mus"],
     requireName: false,
   },
   {
     query: "Apfelsaft",
     means: "Apfelsaft",
-    not: ["frische Äpfel"],
-    acceptCategories: ["saft", "softdrinks", "getrank"],
-    aliases: ["apfelschorle"],
-    reject: ["schnaps", "likor"],
+    not: ["frische Äpfel", "Schorle", "Nektar", "Smoothies"],
+    acceptCategories: ["saft", "fruchtsaft", "obstsaft", "apfelsaft", "softdrinks", "getrank"],
+    aliases: [],
+    nameAliases: ["apfel-direktsaft"],
+    reject: ["schnaps", "likor", "schorle", "nektar", "smoothie"],
     requireName: true,
   },
   {
@@ -277,6 +286,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Ayran", "Kefir"],
     acceptCategories: ["joghurt"],
     aliases: [],
+    nameAliases: ["naturjoghurt"],
     reject: ["ayran", "kefir", "kase"],
     requireName: false,
   },
@@ -332,11 +342,13 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Eisbergsalat", "Eier"],
     acceptCategories: ["eis"],
     aliases: ["eiscreme"],
+    nameAliases: ["speiseeis"],
     reject: ["eisberg", "salat", "eier", "likor"],
     requireName: false,
   },
   {
     query: "Fisch",
+    nameAliases: ["seelachsfilet", "kabeljau", "dorade", "hering", "forelle", "lachs", "lachsfilet"],
     means: "Fisch",
     not: ["Fischstäbchen", "Salat", "Garnelen", "Lampen", "Fahrrad"],
     acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch", "marinierter", "fischkonserven"],
@@ -359,7 +371,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     means: "Räucherlachs",
     not: ["Seelachs", "Schinken"],
     acceptCategories: ["raucherfisch"],
-    aliases: ["stremellachs", "wildlachs"],
+    aliases: ["stremellachs"],
     reject: ["seelachs", "schinken", "forelle"],
     requireName: true,
     stem: true,
@@ -557,10 +569,11 @@ export const EXACT_QUERIES: ExactQuery[] = [
     query: "Schinken",
     means: "Schinken",
     not: ["Croissant", "Schnitzel", "Palatschinken"],
-    acceptCategories: ["schinken"],
+    acceptCategories: ["schinken", "wurstaufschnitt"],
     aliases: [],
-    reject: ["croissant", "schnitzel", "palatschinken", "pizza", "wurst"],
-    requireName: false,
+    nameAliases: ["kochschinken", "rohschinken", "lachsschinken"],
+    reject: ["croissant", "schnitzel", "palatschinken", "pizza"],
+    requireName: true,
   },
   {
     query: "Gouda",
@@ -628,7 +641,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Kaffeemaschine", "Service"],
     acceptCategories: ["kaffee"],
     aliases: [],
-    reject: ["maschine", "vollautomat", "service", "geschirr"],
+    reject: ["maschine", "automat", "service", "geschirr", "tasse", "becher", "muhle", "entkalker"],
     requireName: false,
   },
   {
@@ -679,7 +692,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
     not: ["Ofen", "Dekoration", "nur Teig"],
     acceptCategories: ["tiefkuhlpizza"],
     aliases: [],
-    reject: ["miniatur", "deko", "gutschein", "teig"],
+    reject: ["miniatur", "deko", "gutschein"],
+    rejectIdentity: ["teig", "pizzaofen", "schneider", "backblech", "pizzastein", "teller"],
     requireName: true,
     stem: true,
   },
@@ -722,7 +736,7 @@ function compact(value: string): string {
 }
 
 export function exactQueryFor(query: string): ExactQuery | null {
-  const folded = fold(query.trim());
+  const folded = fold(query.trim().replace(/\s+/g," "));
   if (!folded) return null;
   const ranked = [...EXACT_QUERIES].sort((a, b) => b.query.length - a.query.length);
   for (const rule of ranked) {
@@ -732,22 +746,48 @@ export function exactQueryFor(query: string): ExactQuery | null {
   return null;
 }
 
+function categoryLeaf(category: string): string {
+  return category.split(/[>\/|]/).at(-1)?.trim() ?? "";
+}
+function tokenIs(word: string, stem: string): boolean {
+  return [stem, `${stem}n`, `${stem}en`, `${stem}s`, `${stem}e`].includes(word);
+}
 function categoryOk(category: string, accepts: string[]): boolean {
-  const first = words(category)[0];
-  if (!first || accepts.length === 0) return false;
-  return accepts.some((accept) => {
-    const stem = fold(accept);
-    return first === stem || first === `${stem}n` || first === `${stem}en` || first === `${stem}s`;
-  });
+  return words(categoryLeaf(category)).some(word => accepts.some(accept => tokenIs(word, fold(accept))));
+}
+const broadCategories = new Set([
+  "lebensmittel", "nahrungsmittel", "getranke", "softdrinks", "milchprodukte", "molkereiprodukte",
+  "backwaren", "obst", "gemuse", "obst und gemuse", "tiefkuhlkost", "tiefkuhlgerichte",
+  "fleisch", "fisch", "hygieneartikel", "speiseole", "cerealien", "pflanzliche getranke", "backzutaten", "wein",
+]);
+function specificCategoryConflicts(category: string, rule: ExactQuery): boolean {
+  const leaf = words(categoryLeaf(category)).join(" ");
+  if (!leaf || broadCategories.has(leaf) || categoryOk(category,rule.acceptCategories)) return false;
+  return EXACT_QUERIES.some(other => categoryOk(category,other.acceptCategories));
+}
+function categoryOnly(category: string, rule: ExactQuery): boolean {
+  const leaf = categoryLeaf(category);
+  return categoryOk(leaf,rule.acceptCategories) && !/\b(?:und|oder)\b|[&,]/i.test(leaf);
+}
+const vagueNames = new Set(["original", "classic", "klassik", "premium", "creme", "crema", "natur", "bio", "xxl", "light"]);
+function vagueName(name: string): boolean {
+  const tokens = words(name);
+  return !tokens.length || tokens.every(word => vagueNames.has(word) || /^\d+$/.test(word));
+}
+/** Only an actual leading product description can disambiguate a vague title. */
+function describedIdentity(description: string, rule: ExactQuery): boolean {
+  const lead = description.split(/[,;.!]/)[0];
+  if (/\b(?:mit|aus|fur|zum|enth[aä]lt|servier|ideal)\b/i.test(fold(lead))) return false;
+  return nameOk(lead,rule);
 }
 
 function nameOk(name: string, rule: ExactQuery): boolean {
-  const accepted = [fold(rule.query), ...rule.aliases.map((alias) => fold(alias))];
+  const accepted = [rule.query, ...rule.aliases, ...(rule.nameAliases ?? [])].map(fold);
   const found = words(name);
   if (
     found.some((word) =>
       accepted.some((stem) => {
-        if (word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`) return true;
+        if (tokenIs(word, stem)) return true;
         if (!rule.stem || stem.length < 4) return false;
         return word.startsWith(stem) || word.endsWith(stem);
       }),
@@ -755,10 +795,10 @@ function nameOk(name: string, rule: ExactQuery): boolean {
   ) {
     return true;
   }
-  const packed = compact(name);
-  return accepted.some((stem) => {
-    const token = stem.replace(/[^a-z0-9]+/g, "");
-    return token.length >= 8 && packed.includes(token);
+  return accepted.some(term => {
+    const phrase = words(term);
+    return phrase.length > 1 && (found.includes(compact(term)) || found.some((_,i) =>
+      phrase.every((part,j) => tokenIs(found[i+j] ?? "",part))));
   });
 }
 
@@ -770,39 +810,45 @@ function needed(name: string, description: string, stems: string[] | undefined):
 
 function rejected(name: string, category: string, description: string, stems: string[]): boolean {
   if (stems.length === 0) return false;
-  const packed = compact(`${name} ${category} ${description}`);
+  const packed = [name,category,description].map(compact);
   const found = words(`${name} ${category}`);
   return stems.some((stem) => {
     const needle = fold(stem);
-    return found.includes(needle) || found.some((word) => word.includes(needle)) || packed.includes(needle);
+    return found.includes(needle) || found.some((word) => word.includes(needle)) || packed.some(field=>field.includes(needle));
   });
 }
 
 function genericName(name: string, query: string): boolean {
-  const stem = fold(query.trim());
-  if (stem.length < 3) return false;
-  return words(name).some((word) => word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`);
+  const tokens = words(query.trim());
+  if (!tokens.length || tokens.join(" ").length < 3) return false;
+  const haystack = words(name);
+  return haystack.some((_,i) => tokens.every((token,j) =>
+    j === tokens.length-1 ? tokenIs(haystack[i+j] ?? "",token) : haystack[i+j] === token));
+}
+
+/** Explicit serving/recipe suggestions do not redefine the product identity. */
+function identityDescription(description: string): string {
+  return fold(description).split(/\b(?:serviervorschlag|rezepttipp|ideal\s+(?:fur|zu)|passt\s+zu|zum\s+(?:backen|kochen|servieren)|fur\s+die\s+zubereitung)\b/)[0];
 }
 
 /** True when the offer is the product that was asked for, not a lookalike. */
 export function offerFits(query: string, productName: string, description: string, category: string): boolean {
-  if (incompatibleCategory(exactQueryFor(query)?.query ?? query,category)) return false;
   const rule = exactQueryFor(query);
-  const name = productName || "";
-  const cat = category || "";
-  if (!rule) return genericName(name, query);
-
-  if (rejected(name, cat, description, rule.reject)) return false;
-  if (!needed(name, description, rule.need)) return false;
-  const catMatches = Boolean(cat) && categoryOk(cat, rule.acceptCategories);
-  const named = nameOk(name, rule);
-  if (rule.requireName) {
-    const described = Boolean(rule.need?.length) && needed(name, description, rule.need) && catMatches;
-    if (!named && !described) return false;
-    if (!cat) return true;
-    return catMatches || rule.acceptCategories.length === 0;
-  }
-  if (catMatches) return true;
-  if (!cat) return named;
-  return false;
+  // Title-only variants keep their narrow query matching but inherit the food/non-food guard.
+  const domainRule = rule ?? EXACT_QUERIES.find(candidate => candidate.nameAliases?.some(alias => fold(alias) === fold(query.trim())));
+  if (incompatibleCategory(domainRule?.query ?? query,categoryLeaf(category))) return false;
+  const name = productName || "", cat = category || "";
+  if (!rule) return genericName(name,query);
+  description = identityDescription(description);
+  if (rejected(name,cat,description,rule.reject)) return false;
+  if (rule.rejectIdentity && rejected(name,categoryLeaf(cat),"",rule.rejectIdentity)) return false;
+  if (rule.query === "Pizza" && /\b(?:nur|reiner?)\s+(?:pizza)?teig\b|\bohne\s+belag\b/i.test(fold(description))) return false;
+  if (!needed(name,description,rule.need) || specificCategoryConflicts(cat,rule)) return false;
+  const catMatches = categoryOk(cat,rule.acceptCategories);
+  if (nameOk(name,rule)) return true;
+  // Whole-bean/ground coffee is explicit text evidence, not an unrelated ingredient match.
+  if (["Kaffeebohnen","Filterkaffee"].includes(rule.query) && rule.need?.length && catMatches) return true;
+  if (rule.query === "Kaffee" && catMatches && /\bganze\s+bohnen\b|\bkaffee\s+gemahlen\b/.test(description)) return true;
+  if (vagueName(name) || rule.query === "Milch") return describedIdentity(description,rule);
+  return !rule.requireName && categoryOnly(cat,rule);
 }

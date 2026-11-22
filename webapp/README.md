@@ -29,3 +29,5 @@ Produktvorschläge kommen aus dem beobachteten Produktkatalog.
 
 Archiv und Preisverlauf: [ARCHIVE.md](./ARCHIVE.md).
 Docker Compose: [deploy/README.md](../deploy/README.md).
+
+Produktregeln und geprüfte Gegenbeispiele: [RULES.md](./RULES.md).

@@ -41,7 +41,7 @@ export type SavedOfferQuery = { country: "de" | "at"; zip: string; query: string
 
 export async function savedOffers(sql: ArchiveSql, input: SavedOfferQuery, now = new Date()): Promise<ArchiveOffer[]> {
   const rule = exactQueryFor(input.query);
-  const terms = [input.query, rule?.query ?? "", ...(rule?.aliases ?? []), ...(rule?.acceptCategories ?? [])].filter(Boolean);
+  const terms = [input.query, rule?.query ?? "", ...(rule?.aliases ?? []), ...(rule?.nameAliases ?? []), ...(rule?.acceptCategories ?? [])].filter(Boolean);
   const patterns = [...new Set(terms.flatMap(term=>[productKey(term),term.toLocaleLowerCase("de")]))]
     .filter(Boolean).map(term=>`%${term.replace(/[\\%_]/g,"\\$&")}%`);
   // Select the newest state BEFORE matching names/validity: an older state must

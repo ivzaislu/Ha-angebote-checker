@@ -59,7 +59,7 @@ try {
   // A legacy scan must be rechecked, not displayed as new rules results.
   await page.evaluate(()=>{
     const saved=JSON.parse(localStorage.getItem('angebote-v1'));
-    delete saved.state.scans[saved.state.activeListId].matchingMode;
+    delete saved.state.scans[saved.state.activeListId].rulesVersion;
     localStorage.setItem('angebote-v1',JSON.stringify(saved));
   });
   await page.reload();
@@ -78,6 +78,19 @@ try {
   // Offer photos remain useful independently of the removed review UI.
   const image=page.locator('img[src*="compose-smoke-milk"]').first();
   await image.evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw new Error('Offer photo missing');});
+  for(const name of ['Apfel','Apfelsaft','Pizza','Kaffee']){
+    await page.locator('#item').fill(name);
+    await page.getByRole('button',{name:'Hinzufügen',exact:true}).click();
+  }
+  await page.getByRole('button',{name:'Angebote finden',exact:true}).click();
+  for(const name of ['Knackige Tafeläpfel','Bio Apfel-Direktsaft naturtrüb','Steinofenpizza Margherita','Barista Selection']){
+    await page.locator('article').filter({hasText:name}).waitFor();
+  }
+  for(const name of ['Apfelstrudel','Apfelschorle','Pizzateig','Kaffeetassen']){
+    assert.equal(await page.locator('article').filter({hasText:name}).count(),0,`False match displayed: ${name}`);
+  }
+  await page.reload();
+  await page.locator('article').filter({hasText:'Knackige Tafeläpfel'}).waitFor();
   await page.close();
   const other = await browser.newPage();
   other.on('pageerror', error => errors.push(error.message));

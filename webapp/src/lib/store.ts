@@ -10,6 +10,7 @@ export type ShopList = { id: string; name: string; items: WatchItem[] };
 
 export type LastScan = {
   matchingMode?: string;
+  rulesVersion?: number;
   at: string;
   byItem: Record<string, Deal[]>;
   errors: Record<string, string>;

@@ -1,4 +1,4 @@
-import { scanMatchesMode } from "@/lib/product-matching";
+import { PRODUCT_RULESET_VERSION, scanMatchesMode } from "@/lib/product-matching";
 import { formatDate, formatNumber, displayError } from "@/lib/locale";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -368,7 +368,7 @@ export function AngeboteApp() {
           }
         }),
       );
-      setListScan(list.id, { matchingMode: "rules", at: new Date().toISOString(), byItem, errors });
+      setListScan(list.id, { matchingMode: "rules", rulesVersion: PRODUCT_RULESET_VERSION, at: new Date().toISOString(), byItem, errors });
     }
 
     setScanning(false);
