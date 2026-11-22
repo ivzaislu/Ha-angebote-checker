@@ -15,6 +15,7 @@ test("title aliases do not turn a specific product query into a broader family",
   assert.equal(exactQueryFor("Seelachsfilet"),null);
   assert.equal(exactQueryFor("Wildlachs"),null);
   assert.equal(exactQueryFor("Naturjoghurt"),null);
+  assert.equal(exactQueryFor("Apfelschorle"),null);
   assert.equal(exactQueryFor("Weidemilch"),null);
   assert.equal(exactQueryFor("  Feuchtes   Toilettenpapier ")?.query,"Feuchtes Toilettenpapier");
 });

@@ -83,10 +83,10 @@ try {
     await page.getByRole('button',{name:'Hinzufügen',exact:true}).click();
   }
   await page.getByRole('button',{name:'Angebote finden',exact:true}).click();
-  for(const name of ['Knackige Tafeläpfel','Bio Apfel-Direktsaft naturtrüb','Steinofenpizza Margherita','Barista Selection']){
+  for(const name of ['Knackige Tafeläpfel','Bio Apfel-Direktsaft naturtrüb','Apfelschorle','Steinofenpizza Margherita','Barista Selection']){
     await page.locator('article').filter({hasText:name}).waitFor();
   }
-  for(const name of ['Apfelstrudel','Apfelschorle','Pizzateig','Kaffeetassen']){
+  for(const name of ['Apfelstrudel','Apfelnektar','Pizzateig','Kaffeetassen']){
     assert.equal(await page.locator('article').filter({hasText:name}).count(),0,`False match displayed: ${name}`);
   }
   await page.reload();

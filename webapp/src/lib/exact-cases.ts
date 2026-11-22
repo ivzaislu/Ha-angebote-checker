@@ -97,7 +97,7 @@ export const RULE_CASES: RuleCase[] = [
   no("Apfel","Apfelmus","Obstkonserven","720 g"),
   no("Apfel","Apfelsaft","Getränke","1 l"),
   no("Apfel","Äpfel Deko","Dekorationsartikel","Kunststoff"),
-  no("Apfelsaft","Apfelschorle","Softdrinks","1,5 l"),
+  yes("Apfelsaft","Apfelschorle","Softdrinks","1,5 l"),
   no("Apfelsaft","Apfelnektar","Fruchtsaft","50 % Frucht"),
   no("Apfelsaft","Apfel Smoothie","Getränke","250 ml"),
   no("Apfelsaft","Apfelsaftgläser","Haushaltswaren","6 Stück"),
@@ -228,5 +228,7 @@ export const RULE_CASES: RuleCase[] = [
   yes("Fisch","Rotbarschfilet","Tiefkühlfisch und Meeresfrüchte","400 g"),
   yes("Fisch","Kabeljaufilet","Tiefkühlfisch und Meeresfrüchte","400 g"),
   yes("Fisch","Heringsfilets","Tiefkühlfisch und Meeresfrüchte","400 g"),
+  yes("Apfelschorle","Apfelschorle","Softdrinks","1,5 l"),
+  no("Apfelschorle","Klarer Apfelsaft","Fruchtsaft","1 l"),
   no("Rote Paprika","Grüne Paprika","Gemüse","500 g"),
 ];

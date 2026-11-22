@@ -28,20 +28,20 @@ verwenden dieselbe Entscheidung; Preise, Zeitraum, Land und PLZ bleiben getrennt
 Explizite Servier- und Rezeptabschnitte (`Serviervorschlag`, `Ideal für`, `Zum Backen`)
 ändern die Produktidentität nicht. Angaben vor diesen Markierungen bleiben prüfbar.
 Pizza darf Teig in ihrer Beschreibung nennen; tatsächlicher Pizzateig, Pizzaöfen,
-Schneider und Gutscheine bleiben ausgeschlossen. `Apfelsaft` meint Saft, nicht Schorle,
-Nektar oder Smoothies. `Räucherlachs` meint ausdrücklich geräucherten Lachs, nicht jeden Wildlachs.
+Schneider und Gutscheine bleiben ausgeschlossen. `Apfelsaft` umfasst auf Wunsch des Inhabers Saft und Apfelschorle, aber keinen
+Nektar oder Smoothie. Eine ausdrückliche Suche nach `Apfelschorle` bleibt auf Schorle beschränkt. `Räucherlachs` meint ausdrücklich geräucherten Lachs, nicht jeden Wildlachs.
 
 ## Prüfungen und Grenzen
 
-`exact-cases.ts` enthält 225 ausdrücklich verfasste Regressionsfälle: 108 passende und
+`exact-cases.ts` enthält 227 ausdrücklich verfasste Regressionsfälle: 110 passende und
 117 unpassende bzw. unzureichend bestimmte Beispiele. Einige Texte stammen aus den vom
 Inhaber gemeldeten Fällen; weitere sind gezielte Gegenbeispiele. Das ist keine zufällige,
 unabhängig erhobene Stichprobe aus dem tatsächlichen Angebotsverkehr.
 
 | Prüfung derselben Beispiele | Vorher (`96f2618`) | Jetzt |
 | --- | ---: | ---: |
-| Passende Produkte gefunden | 43 / 108 | 108 / 108 |
-| Falsche Treffer | 16 / 117 | 0 / 117 |
+| Passende Produkte gefunden | 45 / 110 | 110 / 110 |
+| Falsche Treffer | 15 / 117 | 0 / 117 |
 
 Die vorherige Messung verwendet den unveränderten Matcher aus dem genannten Commit
 inklusive Variantenprüfung. Das Ergebnis bedeutet keine garantierte Genauigkeit bei

@@ -146,12 +146,12 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Apfelsaft",
-    means: "Apfelsaft",
-    not: ["frische Äpfel", "Schorle", "Nektar", "Smoothies"],
+    means: "Apfelsaft und Apfelschorle",
+    not: ["frische Äpfel", "Nektar", "Smoothies"],
     acceptCategories: ["saft", "fruchtsaft", "obstsaft", "apfelsaft", "softdrinks", "getrank"],
     aliases: [],
-    nameAliases: ["apfel-direktsaft"],
-    reject: ["schnaps", "likor", "schorle", "nektar", "smoothie"],
+    nameAliases: ["apfel-direktsaft", "apfelschorle"],
+    reject: ["schnaps", "likor", "nektar", "smoothie"],
     requireName: true,
   },
   {
