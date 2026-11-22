@@ -188,3 +188,29 @@ wird aus den unveränderten Kandidatengewichten rekonstruiert und funktioniert a
 bereits gespeicherte Berichte, wenn der Fingerabdruck des Kontrollsatzes übereinstimmt.
 Kontrollbeispiele sind schreibgeschützt, bleiben aus der manuellen Trainingswarteschlange
 ausgeschlossen und werden nicht als neue Trainingsbeispiele übernommen.
+
+
+## Suche standardmäßig mit Regeln
+
+Die Produktsuche verwendet standardmäßig `PRODUCT_MATCHING_MODE=rules`. Name,
+Beschreibung, Kategorien, Ausschlüsse und bestehende Variantenregeln entscheiden
+über Treffer. Auf diesem Suchpfad werden weder Modellgewichte noch der aktive
+Modellzeiger geladen. Archivsuche, Preise, Postleitzahlen, Gültigkeit, Produktbilder,
+Listen und Preisverlauf bleiben verfügbar.
+
+Gespeicherte Modelle und manuelle Bewertungen bleiben erhalten. Auch ein erfolgreiches
+Training schaltet die Suche nicht auf neuronale Entscheidungen um. Die Oberfläche
+zeigt „gespeichert · v2“ und den tatsächlichen Suchmodus. Ältere Suchergebnisse ohne
+Moduskennung oder aus einem anderen Modus werden nicht als aktuelle Ergebnisse
+angezeigt: mit „Angebote finden“ erneut prüfen; ein Prospekt-Update ist nicht nötig.
+
+Nur ein ausdrückliches `PRODUCT_MATCHING_MODE=neural` aktiviert den experimentellen
+neuronalen Suchpfad. Fehlende oder andere Werte verwenden Regeln. Nach Änderungen
+an der Compose-Umgebung muss der App-Container neu erstellt werden, beispielsweise:
+
+```bash
+docker compose up -d --no-deps --force-recreate --wait --wait-timeout 180 app
+```
+
+Der Suchmodus verändert oder löscht keine gespeicherten Gewichte und benötigt keine
+Datenbankmigration. Die Offline-Archivversuche behalten ihre getrennten Qualitätsprüfungen.

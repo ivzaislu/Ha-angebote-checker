@@ -19,7 +19,7 @@ try {
   await page.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
   assert.equal(await page.evaluate(() => isSecureContext), false);
   assert.equal(await page.evaluate(() => typeof crypto.randomUUID), 'undefined');
-  await page.getByText('aktiv · v2',{exact:true}).waitFor();
+  await page.getByText('gespeichert · v2',{exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('lang'), 'de');
   assert.doesNotMatch(await page.locator('body').innerText(), /[А-Яа-яЁё]/);
   await page.getByRole('button', {name:'Einkauf 0', exact:true}).waitFor();
@@ -28,7 +28,7 @@ try {
   await page.getByRole('button',{name:'NKD',exact:true}).click();
   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('angebote-v1')).state.retailers),['NKD']);
   await page.reload();
-  await page.getByText('aktiv · v2',{exact:true}).waitFor();
+  await page.getByText('gespeichert · v2',{exact:true}).waitFor();
   await page.getByText('Geschäfte',{exact:true}).click();
   await page.getByRole('button',{name:'NKD',exact:true}).click();
   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('angebote-v1')).state.retailers),[]);
@@ -54,7 +54,19 @@ try {
   await page.getByRole('button',{name:'Angebote finden',exact:true}).click();
   await page.getByText('aus gespeicherten Angeboten',{exact:true}).waitFor();
   await page.getByText('1,79 €',{exact:true}).waitFor();
-  await page.getByText('vom neuronalen Netz geprüft',{exact:true}).waitFor();
+  await page.getByTestId('search-mode').filter({hasText:'Suche mit Regeln'}).waitFor();
+  assert.equal(await page.getByText('vom neuronalen Netz geprüft',{exact:true}).count(),0);
+  // A legacy scan must be rechecked, not displayed as new rules results.
+  await page.evaluate(()=>{
+    const saved=JSON.parse(localStorage.getItem('angebote-v1'));
+    delete saved.state.scans[saved.state.activeListId].matchingMode;
+    localStorage.setItem('angebote-v1',JSON.stringify(saved));
+  });
+  await page.reload();
+  await page.getByTestId('scan-mode-changed').waitFor();
+  assert.equal(await page.getByText('1,79 €',{exact:true}).count(),0);
+  await page.getByRole('button',{name:'Angebote finden',exact:true}).click();
+  await page.getByText('1,79 €',{exact:true}).waitFor();
   await page.reload();
   await page.getByText('aus gespeicherten Angeboten',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Preisverlauf',exact:true}).click();
@@ -127,12 +139,13 @@ try {
   await other.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
   await other.getByText('Neuronales Produktnetz',{exact:true}).click();
   await other.getByTestId('training-status').getByText(/Trainingsdaten werden vorbereitet|Neuronales Netz wird trainiert|Modell wird geprüft und gespeichert|Training wartet|Training abgeschlossen/).first().waitFor();
-  const terminal = /Training abgeschlossen\. (Modell aktiviert|Qualitätsprüfung nicht bestanden)/;
+  const terminal = /Training abgeschlossen\. (Modell gespeichert|Qualitätsprüfung nicht bestanden)/;
   await other.getByTestId('training-status').getByText(terminal).waitFor({timeout:180_000});
-  if((await other.getByTestId('training-status').innerText()).includes('Modell aktiviert.')) {
+  if((await other.getByTestId('training-status').innerText()).includes('Modell gespeichert.')) {
     const candidate=(await other.getByTestId('training-status').innerText()).match(/product-v2-[a-f0-9]+/)[0];
     await other.getByTestId('active-text-model').filter({hasText:candidate}).waitFor();
   }
+  await other.getByTestId('search-mode').filter({hasText:'Suche mit Regeln'}).waitFor();
   await other.getByTestId('training-learning').filter({hasText:/Weitertraining auf Basis/}).waitFor();
   await other.reload();
   await other.getByText('Neuronales Produktnetz',{exact:true}).click();

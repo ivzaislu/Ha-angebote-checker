@@ -33,7 +33,7 @@ jobs:
           scripts/grok-pwa-plugin.test.mjs
           scripts/preview.test.mjs scripts/sign-out-plan.test.mjs
           src/lib/net.test.ts src/lib/product-knowledge.test.ts
-          src/lib/locale.test.ts src/lib/unit-price.test.ts src/lib/product-variants.test.ts src/lib/offer-archive.test.ts src/lib/corpus.test.ts src/lib/store.test.ts src/lib/offer-cache.test.ts src/lib/archive-experiment.test.ts src/lib/archive-lessons.test.ts src/lib/product-control-diagnostics.test.ts src/lib/product-training.test.ts src/lib/product-training-jobs.test.ts src/lib/product-review-queue.test.ts
+          src/lib/locale.test.ts src/lib/unit-price.test.ts src/lib/product-variants.test.ts src/lib/offer-archive.test.ts src/lib/corpus.test.ts src/lib/store.test.ts src/lib/offer-cache.test.ts src/lib/archive-experiment.test.ts src/lib/archive-lessons.test.ts src/lib/product-control-diagnostics.test.ts src/lib/product-matching.test.ts src/lib/product-training.test.ts src/lib/product-training-jobs.test.ts src/lib/product-review-queue.test.ts
           src/lib/app-data/app-data.test.ts
           src/lib/app-data/readiness-schedule.test.ts
           src/lib/auth/gate-identity.test.ts

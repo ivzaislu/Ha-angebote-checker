@@ -8,6 +8,7 @@ import { inferUnitPrice } from "@/lib/unit-price";
 import { archiveOffers } from "@/lib/offer-archive";
 import { getSql } from "@/lib/db";
 import { savedOffers } from "@/lib/offer-cache";
+import { searchProductModel } from "./product-matching.ts";
 import { currentProductModel } from "@/lib/product-model.server";
 import { decideProduct } from "@/lib/product-policy";
 import { compatibleSalmon } from "@/lib/product-variants";
@@ -183,7 +184,7 @@ export async function searchDeals(input: {
 }): Promise<Deal[]> {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
-  const model = await currentProductModel().catch(error=>{console.error("product model",error);return null;});
+  const model = await searchProductModel(currentProductModel, process.env.PRODUCT_MATCHING_MODE).catch(error=>{console.error("product model",error);return null;});
   const classify = (entry:RawOffer) => decideProduct(model,{
     intent:input.query,name:entry.product?.name || entry.name || "",
     description:entry.description || "",category:entry.categories?.[0]?.name || "",

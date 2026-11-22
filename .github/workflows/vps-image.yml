@@ -88,6 +88,11 @@ jobs:
           node scripts/browser-rejected-review.mjs
           cd ..
           docker compose exec -T -e COMPOSE_SMOKE_TEST=1 -e VERIFY_ONLY=1 app node --experimental-strip-types --input-type=module < deploy/rejected-review-fixture.mjs
+      - name: Verify explicit neural opt-in after default rules checks
+        run: |
+          PRODUCT_MATCHING_MODE=neural docker compose up -d --no-deps --force-recreate --wait --wait-timeout 180 app
+          cd webapp
+          node scripts/browser-matching-mode.mjs
       - name: Container diagnostics
         if: failure()
         run: |

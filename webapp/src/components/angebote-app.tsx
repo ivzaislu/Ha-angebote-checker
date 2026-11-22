@@ -1,3 +1,6 @@
+import { productSearchMode } from "@/lib/scan";
+import type { ProductMatchingMode } from "@/lib/product-matching";
+import { scanMatchesMode } from "@/lib/product-matching";
 import { TrainingLearningDetails } from "./training-learning-details";
 import { formatDate, formatNumber, trainingReason, displayError } from "@/lib/locale";
 import { useEffect, useState } from "react";
@@ -254,7 +257,7 @@ export function AngeboteApp() {
 
   const active = lists.find((list) => list.id === activeListId) ?? lists[0];
   const items = active?.items ?? [];
-  const lastScan = active ? (scans[active.id] ?? null) : null;
+  const savedScan = active ? (scans[active.id] ?? null) : null;
 
   const scan = useServerFn(scanQuery);
   const study = useServerFn(studyLeaflets);
@@ -262,6 +265,8 @@ export function AngeboteApp() {
   const catalogHints = useServerFn(productHints);
   const brainOf = useServerFn(brainSnapshot);
   const modelStatus = useServerFn(neuralModelStatus);
+  const searchMode = useServerFn(productSearchMode);
+  const [matchingMode, setMatchingMode] = useState<ProductMatchingMode>();
   const trainingStatus = useServerFn(neuralTrainingStatus);
   const startTraining = useServerFn(trainNeuralModel);
   const [training, setTraining] = useState<Awaited<ReturnType<typeof neuralTrainingStatus>> | null>(null);
@@ -270,6 +275,7 @@ export function AngeboteApp() {
   const [trainingError, setTrainingError] = useState("");
   const trainingBusy = training?.job?.status === "queued" || training?.job?.status === "running";
   const [neural, setNeural] = useState<Awaited<ReturnType<typeof neuralModelStatus>> | null>(null);
+  const lastScan = scanMatchesMode(savedScan, matchingMode) ? savedScan : null;
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -299,6 +305,7 @@ export function AngeboteApp() {
 
   useEffect(() => {
     void Promise.resolve(useAngebote.persist.rehydrate()).finally(() => setReady(true));
+    void searchMode().then(setMatchingMode).catch(()=>undefined);
     void modelStatus().then(setNeural).catch(()=>undefined);
     void trainingStatus().then(setTraining).catch(() => setTrainingError("Der Trainingsstatus konnte nicht geladen werden"));
   }, []);
@@ -404,6 +411,7 @@ export function AngeboteApp() {
     const targets = lists.filter((list) => list.items.length > 0);
     if (!zipValid || targets.length === 0 || scanning) return;
     setScanning(true);
+    let mode: ProductMatchingMode | undefined;
     setNote("");
     setProgress("");
     const total = targets.reduce((sum, list) => sum + list.items.length, 0);
@@ -415,7 +423,7 @@ export function AngeboteApp() {
       await Promise.all(
         list.items.map(async (item) => {
           try {
-            byItem[item.name] = await scan({
+            const result = await scan({
               data: {
                 country,
                 zip,
@@ -423,6 +431,9 @@ export function AngeboteApp() {
                 retailers,
               },
             });
+            byItem[item.name] = result.deals;
+            mode = result.matchingMode;
+            setMatchingMode(mode);
           } catch (err) {
             byItem[item.name] = [];
             errors[item.name] = displayError(err, "Prüfung fehlgeschlagen");
@@ -432,7 +443,7 @@ export function AngeboteApp() {
           }
         }),
       );
-      setListScan(list.id, { at: new Date().toISOString(), byItem, errors });
+      setListScan(list.id, { matchingMode: mode, at: new Date().toISOString(), byItem, errors });
     }
 
     setScanning(false);
@@ -675,17 +686,29 @@ export function AngeboteApp() {
             </ul>
           </details>
 
+          <p className="mt-4 text-sm" data-testid="search-mode">
+            {matchingMode ? matchingMode === "rules"
+              ? "Suche mit Regeln: Produktname, Beschreibung, Kategorien und Ausschlüsse."
+              : "Experimentelle neuronale Suche mit Rückfall auf Regeln."
+              : "Suchmodus wird geladen…"}
+          </p>
+          {savedScan && matchingMode && !lastScan ? <p className="mt-2 text-sm" data-testid="scan-mode-changed">
+            Frühere Ergebnisse bitte mit „Angebote finden“ erneut prüfen. Gespeicherte Angebote werden zuerst durchsucht; ein Prospekt-Update ist dafür nicht erforderlich.
+          </p> : null}
           <details className="mt-4">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm">
               <span>Neuronales Produktnetz</span>
               <span className="text-muted">
-                {neural?.active ? "aktiv · v2" : "nicht aktiviert"}
+                {neural?.active ? matchingMode === "neural" ? "aktiv · v2" : "gespeichert · v2" : "nicht aktiviert"}
               </span>
             </summary>
+            {matchingMode === "rules" ? <p className="mb-2 text-sm">
+              Die Suche verwendet ausschließlich Regeln. Gespeicherte Modelle und weiteres Training beeinflussen die Suche in diesem Modus nicht.
+            </p> : null}
             <p className="text-sm text-muted" data-testid="active-text-model">
               {neural?.active
                 ? `Version ${neural.active.id}. Trainingsbeispiele: ${neural.active.trainCount}; Validierungsbeispiele: ${neural.active.validationCount}; Kontrollbeispiele: ${neural.active.testCount}. Unterstützte Suchanfragen: ${neural.active.supportedIntents.length}.`
-                : "Die Suche verwendet Regeln. Ein neues neuronales Netz wird nach einem separaten Training und einer Qualitätsprüfung aktiviert."}
+                : "Kein neuronales Modell gespeichert. Ohne Modell verwendet die Suche Regeln."}
             </p>
             {neural?.active ? <p className="mt-2 text-xs text-muted">
               Merkmalsschema: {neural.active.featureVersion}; {neural.active.featureVersion === 3 ? "mit Produktkategoriegruppen" : "Text aus Name, Kategorie und Beschreibung"}.
@@ -713,8 +736,8 @@ export function AngeboteApp() {
                   <p>{training.job.status === "queued" ? "Training wartet…"
                     : training.job.status === "running" ? training.job.stage === "preparing" ? "Trainingsdaten werden vorbereitet…"
                       : training.job.stage === "checking" ? "Modell wird geprüft und gespeichert…" : "Neuronales Netz wird trainiert…"
-                    : training.job.status === "succeeded" ? "Training abgeschlossen. Modell aktiviert."
-                    : training.job.status === "rejected" ? "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Das bisherige Modell bleibt aktiv."
+                    : training.job.status === "succeeded" ? matchingMode === "rules" ? "Training abgeschlossen. Modell gespeichert. Die Suche verwendet weiter Regeln." : "Training abgeschlossen. Modell aktiviert."
+                    : training.job.status === "rejected" ? matchingMode === "rules" ? "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Die Suche verwendet weiter Regeln." : "Training abgeschlossen. Qualitätsprüfung nicht bestanden. Das bisherige Modell bleibt aktiv."
                     : "Das Training konnte nicht abgeschlossen werden. Starten Sie es erneut. Details stehen im Serverprotokoll."}</p>
                   {training.job.result ? <p className="mt-1 text-xs text-muted">
                     Version {training.job.result.candidate}. Trainingsbeispiele: {training.job.result.trainCount}; Validierungsbeispiele: {training.job.result.validationCount}; Kontrollbeispiele: {training.job.result.testCount}.

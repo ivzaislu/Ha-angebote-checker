@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { BrainView, FlyerHint } from "@/lib/brain";
-import type { Deal } from "@/lib/deals";
 
 function input<T extends z.ZodTypeAny>(schema: T, data: unknown): z.output<T> {
   const parsed = schema.safeParse(data);
@@ -35,9 +34,10 @@ export const scanQuery = createServerFn({ method: "POST" })
       retailers: parsed.data.retailers.slice(0, 40),
     };
   })
-  .handler(async ({ data }): Promise<Deal[]> => {
+  .handler(async ({ data }) => {
     const { searchDeals } = await import("@/lib/marktguru.server");
-    return searchDeals(data);
+    const { productMatchingMode } = await import("./product-matching.ts");
+    return { deals: await searchDeals(data), matchingMode: productMatchingMode(process.env.PRODUCT_MATCHING_MODE) };
   });
 
 export const studyLeaflets = createServerFn({ method: "POST" })
@@ -131,3 +131,9 @@ export const answerNeuralReview = createServerFn({ method: "POST" })
     const {key,...answer}=data;
     return answerReview(key,answer);
   });
+
+/** Search configuration does not depend on model tables or weights. */
+export const productSearchMode = createServerFn({method:"GET"}).handler(async()=>{
+  const {productMatchingMode}=await import("./product-matching.ts");
+  return productMatchingMode(process.env.PRODUCT_MATCHING_MODE);
+});

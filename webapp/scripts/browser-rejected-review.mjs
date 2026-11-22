@@ -10,7 +10,7 @@ try {
   await page.route('https://cdn.marktguru.de/**',route=>route.abort());
   await page.goto(`http://angebote-http.test:${port}/`,{waitUntil:'domcontentloaded'});
   await page.getByText('Neuronales Produktnetz',{exact:true}).click();
-  await page.getByText('aktiv · v2',{exact:true}).waitFor();
+  await page.getByText('gespeichert · v2',{exact:true}).waitFor();
   const active=(await page.getByTestId('active-text-model').innerText()).match(/product-v2-[a-f0-9]+/)[0];
   await page.locator('#training-key').fill('wrong-key');
   await page.getByRole('button',{name:'Letzte Ablehnung prüfen',exact:true}).click();
