@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { clientId } from "./client-id.ts";
 import { persist } from "zustand/middleware";
 import type { CountryCode } from "@/lib/catalog";
 import type { Deal } from "@/lib/deals";
@@ -8,6 +9,8 @@ export type WatchItem = { id: string; name: string };
 export type ShopList = { id: string; name: string; items: WatchItem[] };
 
 export type LastScan = {
+  matchingMode?: string;
+  rulesVersion?: number;
   at: string;
   byItem: Record<string, Deal[]>;
   errors: Record<string, string>;
@@ -16,7 +19,7 @@ export type LastScan = {
 const DEFAULT_LIST_ID = "list-einkauf";
 
 function blankList(): ShopList {
-  return { id: DEFAULT_LIST_ID, name: "Покупки", items: [] };
+  return { id: DEFAULT_LIST_ID, name: "Einkauf", items: [] };
 }
 
 type PersistedV1 = {
@@ -71,7 +74,7 @@ export const useAngebote = create<State>()(
         const trimmed = name.trim().replace(/\s+/g, " ");
         if (!trimmed) return false;
         if (get().lists.some((list) => list.name.toLowerCase() === trimmed.toLowerCase())) return false;
-        const id = crypto.randomUUID();
+        const id = clientId();
         set({
           lists: [...get().lists, { id, name: trimmed, items: [] }],
           activeListId: id,
@@ -102,7 +105,7 @@ export const useAngebote = create<State>()(
         set({
           lists: get().lists.map((list) =>
             list.id === current.id
-              ? { ...list, items: [...list.items, { id: crypto.randomUUID(), name: trimmed }] }
+              ? { ...list, items: [...list.items, { id: clientId(), name: trimmed }] }
               : list,
           ),
         });
@@ -163,15 +166,23 @@ export const useAngebote = create<State>()(
       migrate: (persisted) => {
         const state = (persisted ?? {}) as PersistedV1;
         if (state.lists && state.lists.length > 0 && state.activeListId) return state as State;
-        const id = crypto.randomUUID();
+        const id = clientId();
         const scans: Record<string, LastScan> = { ...(state.scans ?? {}) };
         if (state.lastScan) scans[id] = state.lastScan;
         return {
           ...state,
-          lists: [{ id, name: "Покупки", items: state.items ?? [] }],
+          lists: [{ id, name: "Einkauf", items: state.items ?? [] }],
           activeListId: id,
           scans,
         } as State;
+      },
+      merge: (persisted, current) => {
+        const state = { ...current, ...(persisted as Partial<State>) };
+        // Translate only the reserved built-in default; user list names are content.
+        state.lists = state.lists.map(list =>
+          list.id === DEFAULT_LIST_ID && list.name === "\u041f\u043e\u043a\u0443\u043f\u043a\u0438"
+            ? { ...list, name: "Einkauf" } : list);
+        return state;
       },
       partialize: (state) => ({
         lists: state.lists,

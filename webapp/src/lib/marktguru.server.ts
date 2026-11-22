@@ -1,8 +1,12 @@
 import { COUNTRIES, type CountryCode } from "@/lib/catalog";
 import { relevanceScore, type Deal } from "@/lib/deals";
-import { offerFits } from "@/lib/exact";
-import { learnLessons, observeOffers, rememberWeek, snapshotFor, type OfferLesson } from "@/lib/brain.server";
-import { gatherLessons } from "@/lib/corpus.server";
+import { gatherOffers } from "@/lib/corpus.server";
+import { rememberProducts } from "@/lib/product-knowledge.server";
+import { inferUnitPrice } from "@/lib/unit-price";
+import { archiveOffers } from "@/lib/offer-archive";
+import { getSql } from "@/lib/db";
+import { savedOffers } from "@/lib/offer-cache";
+import { matchesProduct } from "./product-matching.ts";
 
 const UA = "Mozilla/5.0";
 
@@ -69,11 +73,11 @@ async function scrapeKeys(country: CountryCode): Promise<Keys> {
     headers: { "user-agent": UA },
     signal: AbortSignal.timeout(12_000),
   });
-  if (!res.ok) throw new Error("Marktguru не открывается");
+  if (!res.ok) throw new Error("Marktguru ist nicht erreichbar");
   const html = await res.text();
   const apiKey = html.match(/"apiKey"\s*:\s*"([^"]+)"/)?.[1];
   const clientKey = html.match(/"clientKey"\s*:\s*"([^"]+)"/)?.[1];
-  if (!apiKey || !clientKey) throw new Error("Ключ Marktguru не найден");
+  if (!apiKey || !clientKey) throw new Error("Marktguru-Schlüssel nicht gefunden");
   const keys = { apiKey, clientKey };
   keyCache.set(country, keys);
   return keys;
@@ -94,10 +98,10 @@ function parseOffer(
   query: string,
   retailers: string[],
   imageTemplate: string,
-  decision: { keep: boolean; fromBrain: boolean } | null,
+
 ): Deal | null {
   const advertiser = entry.advertisers?.[0];
-  const retailer = advertiser?.name || entry.retailerName || "Неизвестно";
+  const retailer = advertiser?.name || entry.retailerName || "Unbekannt";
   if (
     retailers.length > 0 &&
     !retailers.some((name) => retailer.toLowerCase().includes(name.toLowerCase()))
@@ -108,7 +112,7 @@ function parseOffer(
   const productName = entry.product?.name || entry.name || "";
   const description = entry.description || "";
   const category = entry.categories?.[0]?.name ?? "";
-  const keep = decision ? decision.keep : offerFits(query, productName, description, category);
+  const keep = matchesProduct({intent:query,name:productName,description,category});
   if (!keep) return null;
   const relevance = relevanceScore(query, productName, description);
   const { label, value } = formatPrice(entry.price);
@@ -124,13 +128,13 @@ function parseOffer(
     retailer,
     priceLabel: label,
     priceValue: value,
+    unitPrice: inferUnitPrice(`${productName} ${description}`, value),
     validFrom: formatDate(dates?.from || entry.validFrom),
     validTo: formatDate(dates?.to || entry.validTo),
     imageUrl: offerId ? imageTemplate.replace("{offer_id}", String(offerId)) : "",
     relevance,
     onlineOnly: /nur online|online verfügbar/.test(blob),
     category,
-    fromBrain: decision?.fromBrain ?? false,
   };
 }
 
@@ -161,7 +165,7 @@ async function fetchRaw(
   if ((res.status === 401 || res.status === 403) && !forceScrape) {
     return fetchRaw(country, zip, query, true);
   }
-  if (!res.ok) throw new Error(`Marktguru ответил ${res.status}`);
+  if (!res.ok) throw new Error(`Marktguru meldet Status ${res.status}`);
   const data = (await res.json()) as { results?: RawOffer[] };
   return data.results ?? [];
 }
@@ -174,18 +178,24 @@ export async function searchDeals(input: {
 }): Promise<Deal[]> {
   const allowed = new Set(COUNTRIES[input.country].retailers);
   const retailers = input.retailers.filter((name) => allowed.has(name));
-  const raw = await fetchRaw(input.country, input.zip, input.query, false);
-  const lessons: OfferLesson[] = raw.map((entry) => ({
-    name: entry.product?.name || entry.name || "",
-    description: entry.description || "",
-    category: entry.categories?.[0]?.name ?? "",
-  }));
-  let decisions: Array<{ keep: boolean; fromBrain: boolean }> | null = null;
-  try {
-    decisions = await observeOffers(input.query, lessons);
-  } catch (err) {
-    console.error("offer brain", err);
+  const saved = await savedOffers(await getSql(), {...input,retailers},new Date());
+  const cachedDeals = saved.flatMap(entry=>{
+    const deal = parseOffer(entry,input.query,retailers,CONFIG[input.country].image);
+    return deal ? [{...deal,fromArchive:true}] : [];
+  });
+  if (cachedDeals.length) {
+    return cachedDeals.sort((a,b)=>b.relevance-a.relevance || (a.priceValue ?? 1e9)-(b.priceValue ?? 1e9));
   }
+  // A missing local match needs only this query, never a full leaflet crawl.
+  const raw = await fetchRaw(input.country, input.zip, input.query, false);
+  await archiveOffers(await getSql(), input.country, input.zip, raw);
+  await rememberProducts(input.country, raw.map((entry) => ({
+    name: entry.product?.name || entry.name || "",
+    category: entry.categories?.[0]?.name ?? "",
+    retailer: entry.advertisers?.[0]?.name || entry.retailerName || "",
+    offerId: entry.id,
+    price: entry.price,
+  }))).catch((err) => console.error("product catalog", err));
   const seen = new Set<string>();
   const deals: Deal[] = [];
 
@@ -195,7 +205,6 @@ export async function searchDeals(input: {
       input.query,
       retailers,
       CONFIG[input.country].image,
-      decisions?.[index] ?? null,
     );
     if (!deal) continue;
     const key = `${deal.retailer}|${deal.priceLabel}|${deal.description}|${deal.productName}`;
@@ -215,14 +224,10 @@ export async function studyLeaflets(input: {
   country: CountryCode;
   zip: string;
 }): Promise<{ offers: number; already: boolean }> {
-  const status = await rememberWeek();
-  if (status.already) return { offers: status.offers, already: true };
-  try {
-    const lessons = await gatherLessons(input.zip);
-    await learnLessons(lessons);
-  } catch (err) {
-    console.error("leaflet study", err);
-  }
-  const view = await snapshotFor([]);
-  return { offers: view.offers, already: false };
+  if (input.country !== "de") throw new Error("Das Prospektarchiv ist derzeit nur für Deutschland verfügbar");
+  const sql = await getSql();
+  const offers = await gatherOffers(input.zip,
+    (offers) => rememberProducts(input.country, offers),
+    (offers) => archiveOffers(sql, "de", input.zip, offers).then(() => undefined));
+  return { offers, already: false };
 }

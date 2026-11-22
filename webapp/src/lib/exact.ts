@@ -1,16 +1,21 @@
+import { incompatibleCategory } from "./product-category.ts";
 export type ExactQuery = {
   query: string;
   means: string;
   not: string[];
   acceptCategories: string[];
   aliases: string[];
+  /** Product-title variants that must not broaden a specific search query. */
+  nameAliases?: string[];
   reject: string[];
-  /** Category alone is too broad, the name has to be this product too. */
+  /** Category-only matches are disabled for this product. */
   requireName: boolean;
   /** Match Lachs inside Lachsfilet, but not as a loose substring of another food. */
   stem?: boolean;
   /** At least one of these must show up in the name or description. */
   need?: string[];
+  /** Identity words in title/category, not ingredients or serving suggestions. */
+  rejectIdentity?: string[];
 };
 
 /**
@@ -20,17 +25,18 @@ export type ExactQuery = {
 export const EXACT_QUERIES: ExactQuery[] = [
   {
     query: "Milch",
-    means: "молоко",
-    not: ["Buttermilch", "Hafermilch", "Milchreis", "сыр", "йогурт", "шоколад"],
+    means: "Milch",
+    not: ["Buttermilch", "Hafermilch", "Milchreis", "Käse", "Joghurt", "Schokolade"],
     acceptCategories: ["milch"],
     aliases: ["vollmilch", "h-milch", "frische milch"],
-    reject: ["buttermilch", "hafermilch", "mandelmilch", "kokosmilch", "sojamilch", "kondensmilch", "milchreis", "schoko", "joghurt", "miniatur"],
-    requireName: false,
+    nameAliases: ["weidemilch", "kuhmilch", "frischmilch", "rohmilch", "bauernmilch", "landmilch"],
+    reject: ["buttermilch", "hafer", "mandel", "kokos", "soja", "yakult", "kefir", "ayran", "kondensmilch", "milchreis", "schoko", "joghurt", "miniatur"],
+    requireName: true,
   },
   {
     query: "Buttermilch",
-    means: "пахта",
-    not: ["обычное молоко", "масло"],
+    means: "Buttermilch",
+    not: ["normale Milch", "Butter"],
     acceptCategories: ["milch"],
     aliases: [],
     reject: ["hafer"],
@@ -38,8 +44,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Hafermilch",
-    means: "овсяный напиток",
-    not: ["коровье молоко"],
+    means: "Haferdrink",
+    not: ["Kuhmilch"],
     acceptCategories: ["milch", "drink", "pflanz"],
     aliases: ["haferdrink"],
     reject: ["buttermilch"],
@@ -47,8 +53,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Gurke",
-    means: "свежий огурец",
-    not: ["Gewürzgurken", "Essiggurken", "ликёр Gurktaler"],
+    means: "frische Gurke",
+    not: ["Gewürzgurken", "Essiggurken", "Gurktaler-Likör"],
     acceptCategories: ["gurke"],
     aliases: ["gurken", "salatgurke"],
     reject: ["gewurz", "essig", "senf", "gurktal", "likor", "knax"],
@@ -56,8 +62,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Essiggurken",
-    means: "маринованные огурцы",
-    not: ["свежие огурцы", "Gurktaler"],
+    means: "eingelegte Gurken",
+    not: ["frische Gurken", "Gurktaler"],
     acceptCategories: ["gemusekonserven", "gurke", "feinkost"],
     aliases: ["gewurzgurken", "senfgurken"],
     reject: ["gurktal", "likor"],
@@ -65,7 +71,7 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Toilettenpapier",
-    means: "сухая туалетная бумага",
+    means: "trockenes Toilettenpapier",
     not: ["Feuchtes Toilettenpapier"],
     acceptCategories: ["toilettenpapier"],
     aliases: [],
@@ -74,8 +80,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Feuchtes Toilettenpapier",
-    means: "влажная туалетная бумага",
-    not: ["сухие рулоны"],
+    means: "feuchtes Toilettenpapier",
+    not: ["trockene Rollen"],
     acceptCategories: ["toilettenpapier"],
     aliases: ["feuchtetucher", "feuchtes"],
     reject: [],
@@ -83,17 +89,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Butter",
-    means: "сливочное масло",
-    not: ["маргарин", "Butterschmalz", "печенье", "Buttermilch", "Butterkäse"],
+    means: "Butter",
+    not: ["Margarine", "Butterschmalz", "Kekse", "Buttermilch", "Butterkäse"],
     acceptCategories: ["butter"],
     aliases: [],
+    nameAliases: ["markenbutter"],
     reject: ["schmalz", "margarine", "streich", "keks", "cookie", "croissant", "zopf", "stollen", "cracker", "spritz", "buttermilch", "butterkase"],
     requireName: false,
   },
   {
     query: "Käse",
-    means: "сыр",
-    not: ["Crème fraîche", "чизкейк", "соус"],
+    means: "Käse",
+    not: ["Crème fraîche", "Käsekuchen", "Sauce"],
     acceptCategories: ["kase"],
     aliases: [],
     reject: ["fraiche", "kuchen", "sauce", "aufstrich", "quark"],
@@ -101,8 +108,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Brot",
-    means: "хлеб",
-    not: ["Knäckebrot", "Brötchen", "Toast", "круассаны", "пироги"],
+    means: "Brot",
+    not: ["Knäckebrot", "Brötchen", "Toast", "Croissants", "Kuchen"],
     acceptCategories: ["brot"],
     aliases: ["schwarzbrot", "vollkornbrot", "landbrot"],
     reject: ["knacke", "toast", "brotchen", "croissant", "kuchen", "aufstrich"],
@@ -110,17 +117,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Brötchen",
-    means: "булочки",
-    not: ["хлеб", "круассаны"],
+    means: "Brötchen",
+    not: ["Brot", "Croissants"],
     acceptCategories: ["brotchen"],
     aliases: ["semmel", "semmeln"],
+    nameAliases: ["kaiserbrotchen"],
     reject: ["croissant", "kuchen"],
     requireName: false,
   },
   {
     query: "Knäckebrot",
-    means: "хлебцы",
-    not: ["обычный хлеб"],
+    means: "Knäckebrot",
+    not: ["normales Brot"],
     acceptCategories: ["brot"],
     aliases: [],
     reject: [],
@@ -128,26 +136,28 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Apfel",
-    means: "яблоки",
-    not: ["сок", "нектар", "штрудель"],
+    means: "Äpfel",
+    not: ["Saft", "Nektar", "Strudel"],
     acceptCategories: ["apfel"],
     aliases: ["apfel"],
-    reject: ["saft", "nektar", "schorle", "smoothie", "spritz", "kuchen", "tasche", "mus"],
+    nameAliases: ["tafelapfel"],
+    reject: ["saft", "nektar", "schorle", "smoothie", "spritz", "kuchen", "strudel", "tasche", "mus"],
     requireName: false,
   },
   {
     query: "Apfelsaft",
-    means: "яблочный сок",
-    not: ["свежие яблоки"],
-    acceptCategories: ["saft", "softdrinks", "getrank"],
-    aliases: ["apfelschorle"],
-    reject: ["schnaps", "likor"],
+    means: "Apfelsaft und Apfelschorle",
+    not: ["frische Äpfel", "Nektar", "Smoothies"],
+    acceptCategories: ["saft", "fruchtsaft", "obstsaft", "apfelsaft", "softdrinks", "getrank"],
+    aliases: [],
+    nameAliases: ["apfel-direktsaft", "apfelschorle"],
+    reject: ["schnaps", "likor", "nektar", "smoothie"],
     requireName: true,
   },
   {
     query: "Reis",
-    means: "рис",
-    not: ["Milchreis", "чемодан", "рисоварка", "рисовые хлебцы"],
+    means: "Reis",
+    not: ["Milchreis", "Koffer", "Reiskocher", "Reiswaffeln"],
     acceptCategories: ["reis"],
     aliases: ["basmatireis", "langkornreis"],
     reject: ["milch", "reise", "koffer", "kocher", "waffel", "schoko", "sitzer"],
@@ -155,8 +165,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Milchreis",
-    means: "молочный рис",
-    not: ["сухой рис"],
+    means: "Milchreis",
+    not: ["trockener Reis"],
     acceptCategories: ["dessert", "reis", "milch"],
     aliases: [],
     reject: ["basmati", "langkorn", "kocher"],
@@ -164,8 +174,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Eier",
-    means: "яйца",
-    not: ["лапша", "яичный ликёр", "шоколадные яйца"],
+    means: "Eier",
+    not: ["Nudeln", "Eierlikör", "Schokoladeneier"],
     acceptCategories: ["eier"],
     aliases: ["ei"],
     reject: ["teigwaren", "spatzle", "gnocchi", "maultasche", "girasoli", "likor", "schoko", "nudel"],
@@ -173,8 +183,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Wasser",
-    means: "питьевая вода",
-    not: ["чайник", "фильтр", "дезодорант", "спортнапиток"],
+    means: "Trinkwasser",
+    not: ["Wasserkocher", "Filter", "Deodorant", "Sportgetränk"],
     acceptCategories: ["wasser"],
     aliases: ["mineralwasser", "naturelle"],
     reject: ["kocher", "filter", "deo", "karaffe", "sprudler", "waage", "ruder", "spray", "kartusche", "kanne", "sport", "active", "flavou"],
@@ -182,8 +192,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Sahne",
-    means: "сливки",
-    not: ["сельдь в сливках", "йогурт", "соус"],
+    means: "Sahne",
+    not: ["Sahnehering", "Joghurt", "Sauce"],
     acceptCategories: ["sahne"],
     aliases: ["schlagsahne", "kochsahne"],
     reject: ["hering", "joghurt", "wurst", "sauce", "kase", "steif"],
@@ -191,8 +201,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Tomaten",
-    means: "свежие томаты",
-    not: ["Tomatenmark", "соус", "кетчуп", "пассированные"],
+    means: "frische Tomaten",
+    not: ["Tomatenmark", "Sauce", "Ketchup", "passierte Tomaten"],
     acceptCategories: ["tomaten"],
     aliases: ["tomate", "paradeiser", "cherrytomaten", "rispentomaten"],
     reject: ["mark", "ketchup", "sauce", "passier", "konserve", "pizza"],
@@ -200,8 +210,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Tomatenmark",
-    means: "томатная паста",
-    not: ["свежие томаты"],
+    means: "Tomatenmark",
+    not: ["frische Tomaten"],
     acceptCategories: ["tomaten", "dips", "backzutaten"],
     aliases: [],
     reject: ["sauce", "ketchup"],
@@ -209,8 +219,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Zucker",
-    means: "сахар",
-    not: ["лимонад без сахара", "декор", "сироп"],
+    means: "Zucker",
+    not: ["zuckerfreie Limonade", "Dekoration", "Sirup"],
     acceptCategories: ["zucker"],
     aliases: ["puderzucker"],
     reject: ["frei", "zero", "limonade", "sirup", "stange", "dekor", "glasur", "hut", "fichte", "vanillin"],
@@ -218,8 +228,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Nudeln",
-    means: "макароны",
-    not: ["суп из пакетика"],
+    means: "Nudeln",
+    not: ["Tütensuppe"],
     acceptCategories: ["nudeln", "pasta", "teigwaren"],
     aliases: ["spaghetti", "penne", "pasta"],
     reject: ["tasse", "instant", "suppe"],
@@ -227,8 +237,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Öl",
-    means: "растительное масло",
-    not: ["сыр в масле", "распылитель"],
+    means: "Pflanzenöl",
+    not: ["Käse in Öl", "Sprühflasche"],
     acceptCategories: ["ole"],
     aliases: ["olivenol", "sonnenblumenol", "rapsol"],
     reject: ["kase", "wurfel", "zerstauber", "karaffe"],
@@ -236,8 +246,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Olivenöl",
-    means: "оливковое масло",
-    not: ["подсолнечное", "рапсовое", "сыр в масле"],
+    means: "Olivenöl",
+    not: ["Sonnenblumenöl", "Rapsöl", "Käse in Öl"],
     acceptCategories: ["ole"],
     aliases: [],
     reject: ["sonnenblume", "raps", "kurbis", "nuss", "kase", "wurfel"],
@@ -245,8 +255,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Salat",
-    means: "зелёный салат",
-    not: ["сельдь", "картофельный салат", "соус", "тунец"],
+    means: "Blattsalat",
+    not: ["Hering", "Kartoffelsalat", "Sauce", "Thunfisch"],
     acceptCategories: ["salate"],
     aliases: ["eisbergsalat", "kopfsalat"],
     reject: ["thunfisch", "hering", "kartoffel", "dressing", "creme", "hummus", "fisch"],
@@ -254,8 +264,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Kartoffeln",
-    means: "картофель",
-    not: ["фри", "рёсти", "марципановые картофелины"],
+    means: "Kartoffeln",
+    not: ["Pommes frites", "Rösti", "Marzipankartoffeln"],
     acceptCategories: ["wurzelgemuse", "kartoffel"],
     aliases: ["erdapfel", "speisekartoffeln"],
     reject: ["pommes", "rosti", "marzipan", "schoko", "herzogin", "longs"],
@@ -263,8 +273,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Pommes",
-    means: "картофель фри",
-    not: ["сырая картошка", "марципан"],
+    means: "Pommes frites",
+    not: ["rohe Kartoffeln", "Marzipan"],
     acceptCategories: ["tiefkuhlkartoffeln", "kartoffel"],
     aliases: [],
     reject: ["marzipan", "schoko"],
@@ -272,17 +282,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Joghurt",
-    means: "йогурт",
-    not: ["Ayran", "кефир"],
+    means: "Joghurt",
+    not: ["Ayran", "Kefir"],
     acceptCategories: ["joghurt"],
     aliases: [],
+    nameAliases: ["naturjoghurt"],
     reject: ["ayran", "kefir", "kase"],
     requireName: false,
   },
   {
     query: "Bier",
-    means: "пиво",
-    not: ["декоративная миниатюра"],
+    means: "Bier",
+    not: ["dekorative Miniatur"],
     acceptCategories: ["bier", "alkoholfreies"],
     aliases: ["pils", "helles"],
     reject: ["miniatur", "deko"],
@@ -290,8 +301,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Wein",
-    means: "вино",
-    not: ["глинтвейн", "игристое", "аперитив"],
+    means: "Wein",
+    not: ["Glühwein", "Schaumwein", "Aperitif"],
     acceptCategories: ["wein", "rotweine", "weissweine", "roseweine"],
     aliases: [],
     reject: ["gluh", "sekt", "bowle", "aperitif", "spritz", "met"],
@@ -299,8 +310,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Weizenbier",
-    means: "пшеничное пиво",
-    not: ["пильзнер", "радлер"],
+    means: "Weizenbier",
+    not: ["Pils", "Radler"],
     acceptCategories: ["bier"],
     aliases: ["weissbier"],
     reject: ["pils", "radler", "miniatur"],
@@ -309,8 +320,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Rotwein",
-    means: "красное вино",
-    not: ["белое", "глинтвейн", "игристое"],
+    means: "Rotwein",
+    not: ["Weißwein", "Glühwein", "Schaumwein"],
     acceptCategories: ["rotweine"],
     aliases: [],
     reject: ["gluh", "sekt", "weiss"],
@@ -318,8 +329,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Weißwein",
-    means: "белое вино",
-    not: ["красное", "глинтвейн"],
+    means: "Weißwein",
+    not: ["Rotwein", "Glühwein"],
     acceptCategories: ["weissweine"],
     aliases: ["weisswein"],
     reject: ["gluh", "sekt"],
@@ -327,17 +338,19 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Eis",
-    means: "мороженое",
-    not: ["Eisbergsalat", "яйца"],
+    means: "Speiseeis",
+    not: ["Eisbergsalat", "Eier"],
     acceptCategories: ["eis"],
     aliases: ["eiscreme"],
+    nameAliases: ["speiseeis"],
     reject: ["eisberg", "salat", "eier", "likor"],
     requireName: false,
   },
   {
     query: "Fisch",
-    means: "рыба",
-    not: ["палочки", "салат", "креветки", "лампы", "велосипед"],
+    nameAliases: ["seelachsfilet", "kabeljau", "dorade", "hering", "forelle", "lachs", "lachsfilet", "rotbarschfilet", "schellfischfilet", "kabeljaufilet", "dorschfilet", "forellenfilet", "heringsfilet"],
+    means: "Fisch",
+    not: ["Fischstäbchen", "Salat", "Garnelen", "Lampen", "Fahrrad"],
     acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch", "marinierter", "fischkonserven"],
     aliases: [],
     reject: ["stabchen", "salat", "garnele", "muschel", "octopus", "leuchte", "lampe", "bike", "fahrrad"],
@@ -345,8 +358,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Lachs",
-    means: "лосось",
-    not: ["Seelachs", "Lachsschinken", "баранина", "форель", "пирог"],
+    means: "Lachs",
+    not: ["Seelachs", "Lachsschinken", "Lammfleisch", "Forelle", "Kuchen"],
     acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch", "marinierter"],
     aliases: ["lachsfilet"],
     reject: ["seelachs", "schinken", "kasseler", "lamm", "forelle", "aufstrich", "blatterteig"],
@@ -355,18 +368,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Räucherlachs",
-    means: "копчёный лосось",
-    not: ["сайда", "ветчина"],
+    means: "Räucherlachs",
+    not: ["Seelachs", "Schinken"],
     acceptCategories: ["raucherfisch"],
-    aliases: ["stremellachs", "wildlachs"],
+    aliases: ["stremellachs"],
     reject: ["seelachs", "schinken", "forelle"],
     requireName: true,
     stem: true,
   },
   {
     query: "Seelachs",
-    means: "сайда, это не лосось",
-    not: ["лосось"],
+    means: "Seelachs, kein Lachs",
+    not: ["Lachs"],
     acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch", "fischkonserven"],
     aliases: [],
     reject: ["raucherlachs", "schinken"],
@@ -375,8 +388,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Thunfisch",
-    means: "тунец",
-    not: ["салат с тунцом", "лосось"],
+    means: "Thunfisch",
+    not: ["Thunfischsalat", "Lachs"],
     acceptCategories: ["fischkonserven", "frischfisch", "tiefkuhlfisch"],
     aliases: ["thunfischfilet"],
     reject: ["salat", "lachs"],
@@ -385,8 +398,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Hering",
-    means: "сельдь",
-    not: ["лосось", "креветки"],
+    means: "Hering",
+    not: ["Lachs", "Garnelen"],
     acceptCategories: ["fischkonserven", "marinierter", "raucherfisch", "fischsalate"],
     aliases: ["heringsfilet", "matjes"],
     reject: ["lachs", "garnele"],
@@ -395,8 +408,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Garnelen",
-    means: "креветки",
-    not: ["рыба", "мидии", "осьминог"],
+    means: "Garnelen",
+    not: ["Fisch", "Muscheln", "Oktopus"],
     acceptCategories: ["meeresfruchte", "tiefkuhlfisch"],
     aliases: ["garnele"],
     reject: ["muschel", "octopus", "stabchen", "lachs"],
@@ -405,8 +418,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Fischstäbchen",
-    means: "рыбные палочки",
-    not: ["филе", "креветки"],
+    means: "Fischstäbchen",
+    not: ["Filet", "Garnelen"],
     acceptCategories: ["tiefkuhlfisch", "tiefkuhlgerichte"],
     aliases: [],
     reject: ["garnele", "lachs"],
@@ -415,8 +428,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Forelle",
-    means: "форель",
-    not: ["сайда"],
+    means: "Forelle",
+    not: ["Seelachs"],
     acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch"],
     aliases: ["lachsforelle"],
     reject: ["seelachs"],
@@ -425,8 +438,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Rotbarsch",
-    means: "морской окунь",
-    not: ["лосось", "палочки"],
+    means: "Rotbarsch",
+    not: ["Lachs", "Fischstäbchen"],
     acceptCategories: ["frischfisch", "raucherfisch", "tiefkuhlfisch"],
     aliases: [],
     reject: ["lachs", "stabchen"],
@@ -435,8 +448,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Schellfisch",
-    means: "пикша",
-    not: ["лосось", "треска", "палочки"],
+    means: "Schellfisch",
+    not: ["Lachs", "Kabeljau", "Fischstäbchen"],
     acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch"],
     aliases: [],
     reject: ["lachs", "kabeljau", "dorsch", "stabchen"],
@@ -445,8 +458,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Kabeljau",
-    means: "треска",
-    not: ["пикша", "лосось", "палочки"],
+    means: "Kabeljau",
+    not: ["Schellfisch", "Lachs", "Fischstäbchen"],
     acceptCategories: ["frischfisch", "tiefkuhlfisch", "raucherfisch", "fischkonserven"],
     aliases: ["dorsch"],
     reject: ["schellfisch", "lachs", "stabchen"],
@@ -455,8 +468,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Dorade",
-    means: "дорада",
-    not: ["лосось", "окунь"],
+    means: "Dorade",
+    not: ["Lachs", "Barsch"],
     acceptCategories: ["frischfisch", "tiefkuhlfisch"],
     aliases: [],
     reject: ["lachs", "barsch"],
@@ -465,8 +478,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Muscheln",
-    means: "мидии",
-    not: ["креветки", "осьминог"],
+    means: "Muscheln",
+    not: ["Garnelen", "Oktopus"],
     acceptCategories: ["meeresfruchte", "tiefkuhlfisch"],
     aliases: ["miesmuscheln"],
     reject: ["garnele", "octopus"],
@@ -475,8 +488,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Hähnchen",
-    means: "курица",
-    not: ["наггетсы", "колбаса", "приправа"],
+    means: "Hähnchen",
+    not: ["Nuggets", "Wurst", "Gewürz"],
     acceptCategories: ["geflugel", "mariniertes", "tiefkuhlfleisch", "tiefkuhlgerichte"],
     aliases: [],
     reject: ["nugget", "wurst", "wiener", "gewurz", "aspik"],
@@ -485,8 +498,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Hähnchenbrust",
-    means: "куриная грудка",
-    not: ["окорочка", "наггетсы", "колбаса"],
+    means: "Hähnchenbrust",
+    not: ["Hähnchenschenkel", "Nuggets", "Wurst"],
     acceptCategories: ["geflugel", "mariniertes", "tiefkuhlfleisch", "tiefkuhlgerichte"],
     aliases: ["brustfilet"],
     reject: ["schenkel", "nugget", "wurst", "gewurz", "keule", "pute"],
@@ -496,8 +509,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Pute",
-    means: "индейка",
-    not: ["курица", "колбаса"],
+    means: "Pute",
+    not: ["Hähnchen", "Wurst"],
     acceptCategories: ["geflugel", "tiefkuhlfleisch"],
     aliases: ["puten"],
     reject: ["wurst", "hahnchen"],
@@ -506,8 +519,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Hackfleisch",
-    means: "фарш",
-    not: ["колбаса"],
+    means: "Hackfleisch",
+    not: ["Wurst"],
     acceptCategories: ["hackfleisch"],
     aliases: [],
     reject: ["wurst"],
@@ -515,8 +528,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Rinderhack",
-    means: "говяжий фарш",
-    not: ["свиной фарш", "смешанный фарш"],
+    means: "Rinderhackfleisch",
+    not: ["Schweinehackfleisch", "gemischtes Hackfleisch"],
     acceptCategories: ["hackfleisch"],
     aliases: ["rinderhackfleisch"],
     reject: ["schwein", "gemischt"],
@@ -525,8 +538,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Wurst",
-    means: "колбаса и сосиски",
-    not: ["пицца", "круассан"],
+    means: "Wurst und Würstchen",
+    not: ["Pizza", "Croissant"],
     acceptCategories: ["wurste", "wurstaufschnitt", "koch"],
     aliases: [],
     reject: ["pizza", "croissant"],
@@ -534,8 +547,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Leberwurst",
-    means: "ливерная колбаса",
-    not: ["сосиски", "ветчина"],
+    means: "Leberwurst",
+    not: ["Würstchen", "Schinken"],
     acceptCategories: ["koch", "wurste", "wurstaufschnitt"],
     aliases: [],
     reject: ["pizza", "schinken"],
@@ -544,8 +557,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Salami",
-    means: "салями",
-    not: ["ветчина", "сосиски"],
+    means: "Salami",
+    not: ["Schinken", "Würstchen"],
     acceptCategories: ["wurste", "wurstaufschnitt", "wurst"],
     aliases: [],
     reject: ["schinken"],
@@ -554,17 +567,18 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Schinken",
-    means: "ветчина",
-    not: ["круассан", "шницель", "палачинки"],
-    acceptCategories: ["schinken"],
+    means: "Schinken",
+    not: ["Croissant", "Schnitzel", "Palatschinken"],
+    acceptCategories: ["schinken", "wurstaufschnitt"],
     aliases: [],
-    reject: ["croissant", "schnitzel", "palatschinken", "pizza", "wurst"],
-    requireName: false,
+    nameAliases: ["kochschinken", "rohschinken", "lachsschinken", "serranoschinken", "parmaschinken", "katenschinken"],
+    reject: ["croissant", "schnitzel", "palatschinken", "pizza"],
+    requireName: true,
   },
   {
     query: "Gouda",
-    means: "сыр гауда",
-    not: ["моцарелла", "фета", "пармезан"],
+    means: "Gouda",
+    not: ["Mozzarella", "Feta", "Parmesan"],
     acceptCategories: ["kase"],
     aliases: [],
     reject: ["mozzarella", "feta", "parmesan"],
@@ -573,8 +587,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Feta",
-    means: "фета",
-    not: ["гауда", "моцарелла"],
+    means: "Feta",
+    not: ["Gouda", "Mozzarella"],
     acceptCategories: ["kase"],
     aliases: ["hirtenkase"],
     reject: ["gouda", "mozzarella", "parmesan"],
@@ -583,8 +597,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Mozzarella",
-    means: "моцарелла",
-    not: ["гауда", "фета"],
+    means: "Mozzarella",
+    not: ["Gouda", "Feta"],
     acceptCategories: ["kase"],
     aliases: [],
     reject: ["gouda", "feta", "parmesan"],
@@ -593,8 +607,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Parmesan",
-    means: "пармезан",
-    not: ["гауда", "моцарелла"],
+    means: "Parmesan",
+    not: ["Gouda", "Mozzarella"],
     acceptCategories: ["kase"],
     aliases: ["parmigiano"],
     reject: ["gouda", "feta", "mozzarella"],
@@ -603,8 +617,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Frischkäse",
-    means: "сливочный сыр",
-    not: ["твёрдый сыр", "кварк"],
+    means: "Frischkäse",
+    not: ["Hartkäse", "Quark"],
     acceptCategories: ["kase"],
     aliases: [],
     reject: ["gouda", "quark", "parmesan"],
@@ -613,8 +627,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Quark",
-    means: "кварк",
-    not: ["сыр", "десертный крем"],
+    means: "Quark",
+    not: ["Käse", "Dessertcreme"],
     acceptCategories: ["kase"],
     aliases: ["topfen"],
     reject: ["gouda", "frischkase"],
@@ -623,17 +637,17 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Kaffee",
-    means: "кофе",
-    not: ["кофемашина", "сервиз"],
+    means: "Kaffee",
+    not: ["Kaffeemaschine", "Service"],
     acceptCategories: ["kaffee"],
     aliases: [],
-    reject: ["maschine", "vollautomat", "service", "geschirr"],
+    reject: ["maschine", "automat", "service", "geschirr", "tasse", "becher", "muhle", "entkalker"],
     requireName: false,
   },
   {
     query: "Kaffeebohnen",
-    means: "кофе в зёрнах",
-    not: ["молотый", "капсулы", "кофемашина"],
+    means: "Kaffeebohnen",
+    not: ["gemahlen", "Kapseln", "Kaffeemaschine"],
     acceptCategories: ["kaffee"],
     aliases: [],
     reject: ["kapsel", "pads", "loslich", "maschine", "gemahlen"],
@@ -643,8 +657,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Filterkaffee",
-    means: "молотый кофе",
-    not: ["капсулы", "кофемашина"],
+    means: "Filterkaffee",
+    not: ["Kapseln", "Kaffeemaschine"],
     acceptCategories: ["kaffee"],
     aliases: [],
     reject: ["kapsel", "pads", "maschine", "loslich"],
@@ -654,8 +668,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Tee",
-    means: "чай",
-    not: ["чайный набор"],
+    means: "Tee",
+    not: ["Teeservice"],
     acceptCategories: ["tee"],
     aliases: ["schwarztee"],
     reject: ["set", "kanne"],
@@ -663,8 +677,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Kräutertee",
-    means: "травяной чай",
-    not: ["чёрный чай", "набор"],
+    means: "Kräutertee",
+    not: ["Schwarztee", "Set"],
     acceptCategories: ["tee"],
     aliases: [],
     reject: ["set", "schwarz"],
@@ -674,18 +688,19 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Pizza",
-    means: "пицца",
-    not: ["печь", "декор", "только тесто"],
+    means: "Pizza",
+    not: ["Ofen", "Dekoration", "nur Teig"],
     acceptCategories: ["tiefkuhlpizza"],
     aliases: [],
-    reject: ["miniatur", "deko", "gutschein", "teig"],
+    reject: ["miniatur", "deko", "gutschein"],
+    rejectIdentity: ["teig", "pizzaofen", "schneider", "backblech", "pizzastein", "teller"],
     requireName: true,
     stem: true,
   },
   {
     query: "Müsli",
-    means: "мюсли",
-    not: ["батончик", "миска", "йогурт"],
+    means: "Müsli",
+    not: ["Riegel", "Schüssel", "Joghurt"],
     acceptCategories: ["muslimischungen", "musli"],
     aliases: [],
     reject: ["riegel", "schale", "joghurt"],
@@ -694,8 +709,8 @@ export const EXACT_QUERIES: ExactQuery[] = [
   },
   {
     query: "Cola",
-    means: "кола",
-    not: ["попкорн", "виски"],
+    means: "Cola",
+    not: ["Popcorn", "Whisky"],
     acceptCategories: ["softdrinks"],
     aliases: ["pepsi"],
     reject: ["popcorn", "maker", "whisky", "walker"],
@@ -721,7 +736,7 @@ function compact(value: string): string {
 }
 
 export function exactQueryFor(query: string): ExactQuery | null {
-  const folded = fold(query.trim());
+  const folded = fold(query.trim().replace(/\s+/g," "));
   if (!folded) return null;
   const ranked = [...EXACT_QUERIES].sort((a, b) => b.query.length - a.query.length);
   for (const rule of ranked) {
@@ -731,22 +746,48 @@ export function exactQueryFor(query: string): ExactQuery | null {
   return null;
 }
 
+function categoryLeaf(category: string): string {
+  return category.split(/[>\/|]/).at(-1)?.trim() ?? "";
+}
+function tokenIs(word: string, stem: string): boolean {
+  return [stem, `${stem}n`, `${stem}en`, `${stem}s`, `${stem}e`].includes(word);
+}
 function categoryOk(category: string, accepts: string[]): boolean {
-  const first = words(category)[0];
-  if (!first || accepts.length === 0) return false;
-  return accepts.some((accept) => {
-    const stem = fold(accept);
-    return first === stem || first === `${stem}n` || first === `${stem}en` || first === `${stem}s`;
-  });
+  return words(categoryLeaf(category)).some(word => accepts.some(accept => tokenIs(word, fold(accept))));
+}
+const broadCategories = new Set([
+  "lebensmittel", "nahrungsmittel", "getranke", "softdrinks", "milchprodukte", "molkereiprodukte",
+  "backwaren", "obst", "gemuse", "obst und gemuse", "tiefkuhlkost", "tiefkuhlgerichte",
+  "fleisch", "fisch", "hygieneartikel", "speiseole", "cerealien", "pflanzliche getranke", "backzutaten", "wein",
+]);
+function specificCategoryConflicts(category: string, rule: ExactQuery): boolean {
+  const leaf = words(categoryLeaf(category)).join(" ");
+  if (!leaf || broadCategories.has(leaf) || categoryOk(category,rule.acceptCategories)) return false;
+  return EXACT_QUERIES.some(other => categoryOk(category,other.acceptCategories));
+}
+function categoryOnly(category: string, rule: ExactQuery): boolean {
+  const leaf = categoryLeaf(category);
+  return categoryOk(leaf,rule.acceptCategories) && !/\b(?:und|oder)\b|[&,]/i.test(leaf);
+}
+const vagueNames = new Set(["original", "classic", "klassik", "premium", "creme", "crema", "natur", "bio", "xxl", "light"]);
+function vagueName(name: string): boolean {
+  const tokens = words(name);
+  return !tokens.length || tokens.every(word => vagueNames.has(word) || /^\d+$/.test(word));
+}
+/** Only an actual leading product description can disambiguate a vague title. */
+function describedIdentity(description: string, rule: ExactQuery): boolean {
+  const lead = description.split(/[,;.!]/)[0];
+  if (/\b(?:mit|aus|fur|zum|enth[aä]lt|servier|ideal)\b/i.test(fold(lead))) return false;
+  return nameOk(lead,rule);
 }
 
 function nameOk(name: string, rule: ExactQuery): boolean {
-  const accepted = [fold(rule.query), ...rule.aliases.map((alias) => fold(alias))];
+  const accepted = [rule.query, ...rule.aliases, ...(rule.nameAliases ?? [])].map(fold);
   const found = words(name);
   if (
     found.some((word) =>
       accepted.some((stem) => {
-        if (word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`) return true;
+        if (tokenIs(word, stem)) return true;
         if (!rule.stem || stem.length < 4) return false;
         return word.startsWith(stem) || word.endsWith(stem);
       }),
@@ -754,10 +795,10 @@ function nameOk(name: string, rule: ExactQuery): boolean {
   ) {
     return true;
   }
-  const packed = compact(name);
-  return accepted.some((stem) => {
-    const token = stem.replace(/[^a-z0-9]+/g, "");
-    return token.length >= 8 && packed.includes(token);
+  return accepted.some(term => {
+    const phrase = words(term);
+    return phrase.length > 1 && (found.includes(compact(term)) || found.some((_,i) =>
+      phrase.every((part,j) => tokenIs(found[i+j] ?? "",part))));
   });
 }
 
@@ -769,45 +810,45 @@ function needed(name: string, description: string, stems: string[] | undefined):
 
 function rejected(name: string, category: string, description: string, stems: string[]): boolean {
   if (stems.length === 0) return false;
-  const packed = compact(`${name} ${category} ${description}`);
+  const packed = [name,category,description].map(compact);
   const found = words(`${name} ${category}`);
   return stems.some((stem) => {
     const needle = fold(stem);
-    return found.includes(needle) || found.some((word) => word.includes(needle)) || packed.includes(needle);
+    return found.includes(needle) || found.some((word) => word.includes(needle)) || packed.some(field=>field.includes(needle));
   });
 }
 
 function genericName(name: string, query: string): boolean {
-  const stem = fold(query.trim());
-  if (stem.length < 3) return false;
-  return words(name).some((word) => word === stem || word === `${stem}n` || word === `${stem}en` || word === `${stem}s`);
+  const tokens = words(query.trim());
+  if (!tokens.length || tokens.join(" ").length < 3) return false;
+  const haystack = words(name);
+  return haystack.some((_,i) => tokens.every((token,j) =>
+    j === tokens.length-1 ? tokenIs(haystack[i+j] ?? "",token) : haystack[i+j] === token));
 }
 
-/** True when a handwritten reject fired. The learner must not overrule these. */
-export function hardReject(query: string, productName: string, description: string, category: string): boolean {
-  const rule = exactQueryFor(query);
-  if (!rule) return false;
-  return rejected(productName || "", category || "", description || "", rule.reject);
+/** Explicit serving/recipe suggestions do not redefine the product identity. */
+function identityDescription(description: string): string {
+  return fold(description).split(/\b(?:serviervorschlag|rezepttipp|ideal\s+(?:fur|zu)|passt\s+zu|zum\s+(?:backen|kochen|servieren)|fur\s+die\s+zubereitung)\b/)[0];
 }
 
 /** True when the offer is the product that was asked for, not a lookalike. */
 export function offerFits(query: string, productName: string, description: string, category: string): boolean {
   const rule = exactQueryFor(query);
-  const name = productName || "";
-  const cat = category || "";
-  if (!rule) return genericName(name, query);
-
-  if (rejected(name, cat, description, rule.reject)) return false;
-  if (!needed(name, description, rule.need)) return false;
-  const catMatches = Boolean(cat) && categoryOk(cat, rule.acceptCategories);
-  const named = nameOk(name, rule);
-  if (rule.requireName) {
-    const described = Boolean(rule.need?.length) && needed(name, description, rule.need) && catMatches;
-    if (!named && !described) return false;
-    if (!cat) return true;
-    return catMatches || rule.acceptCategories.length === 0;
-  }
-  if (catMatches) return true;
-  if (!cat) return named;
-  return false;
+  // Title-only variants keep their narrow query matching but inherit the food/non-food guard.
+  const domainRule = rule ?? EXACT_QUERIES.find(candidate => candidate.nameAliases?.some(alias => fold(alias) === fold(query.trim())));
+  if (incompatibleCategory(domainRule?.query ?? query,categoryLeaf(category))) return false;
+  const name = productName || "", cat = category || "";
+  if (!rule) return genericName(name,query);
+  description = identityDescription(description);
+  if (rejected(name,cat,description,rule.reject)) return false;
+  if (rule.rejectIdentity && rejected(name,categoryLeaf(cat),"",rule.rejectIdentity)) return false;
+  if (rule.query === "Pizza" && /\b(?:nur|reiner?)\s+(?:pizza)?teig\b|\bohne\s+belag\b/i.test(fold(description))) return false;
+  if (!needed(name,description,rule.need) || specificCategoryConflicts(cat,rule)) return false;
+  const catMatches = categoryOk(cat,rule.acceptCategories);
+  if (nameOk(name,rule)) return true;
+  // Whole-bean/ground coffee is explicit text evidence, not an unrelated ingredient match.
+  if (["Kaffeebohnen","Filterkaffee"].includes(rule.query) && rule.need?.length && catMatches) return true;
+  if (rule.query === "Kaffee" && catMatches && /\bganze\s+bohnen\b|\bkaffee\s+gemahlen\b/.test(description)) return true;
+  if (vagueName(name) || rule.query === "Milch") return describedIdentity(description,rule);
+  return !rule.requireName && categoryOnly(cat,rule);
 }

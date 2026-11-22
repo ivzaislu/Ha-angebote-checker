@@ -17,4 +17,17 @@ npm install
 npm run dev
 ```
 
-Приложение откроется на порту 8080. `npm run build` собирает его для Vercel. Обученные веса сети лежат в `src/lib/trained-brain.json`. Повторное обучение на актуальных листовках: `node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/train-brain.ts`.
+Приложение откроется на порту 8080. `npm run build` собирает его для Vercel.
+
+
+## Produktsuche
+
+Die Anwendung arbeitet ausschließlich mit Regeln für Produktnamen, Beschreibungen,
+Kategorien und Varianten. Sie durchsucht zuerst gültige regionale Archivangebote.
+Neuronale Modelle, Training und manuelle Lernbewertungen sind entfernt.
+Produktvorschläge kommen aus dem beobachteten Produktkatalog.
+
+Archiv und Preisverlauf: [ARCHIVE.md](./ARCHIVE.md).
+Docker Compose: [deploy/README.md](../deploy/README.md).
+
+Produktregeln und geprüfte Gegenbeispiele: [RULES.md](./RULES.md).

@@ -6,13 +6,14 @@ export type Deal = {
   retailer: string;
   priceLabel: string;
   priceValue: number | null;
+  unitPrice?: { unit: "kg" | "l"; quantity: number; perUnit: number } | null;
   validFrom: string;
   validTo: string;
   imageUrl: string;
   relevance: number;
   onlineOnly: boolean;
   category: string;
-  fromBrain?: boolean;
+  fromArchive?: boolean;
 };
 
 export type ItemScan = {

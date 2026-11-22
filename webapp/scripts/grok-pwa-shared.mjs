@@ -163,6 +163,7 @@ export function renderWebManifest(hostHeader) {
     {
       name,
       short_name: name,
+      lang: "de",
       id: "/",
       start_url: "/",
       scope: "/",
