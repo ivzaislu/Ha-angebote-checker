@@ -1,7 +1,7 @@
 import { offerFits } from "./exact.ts";
 import { compatibleSalmon } from "./product-variants.ts";
 
-export const PRODUCT_RULESET_VERSION = 2;
+export const PRODUCT_RULESET_VERSION = 3;
 
 export type ProductText = {intent: string; name: string; description: string; category: string};
 /** Deterministic matching shared by archived and remote offers. */

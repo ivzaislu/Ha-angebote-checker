@@ -220,5 +220,13 @@ export const RULE_CASES: RuleCase[] = [
   no("Naturjoghurt","Fruchtjoghurt Erdbeere","Joghurt","500 g"),
   no("Weidemilch","H-Milch","Milch","1 l"),
   no("Naturjoghurt","Naturjoghurt","Gesichtspflege","200 ml"),
+  yes("Milch","Frischmilch","Milch","1 l"),
+  yes("Milch","Rohmilch","Milch","1 l"),
+  yes("Milch","Landmilch","Milch","1 l"),
+  yes("Schinken","Serranoschinken","Schinken","150 g"),
+  yes("Schinken","Parmaschinken","Schinken","150 g"),
+  yes("Fisch","Rotbarschfilet","Tiefkühlfisch und Meeresfrüchte","400 g"),
+  yes("Fisch","Kabeljaufilet","Tiefkühlfisch und Meeresfrüchte","400 g"),
+  yes("Fisch","Heringsfilets","Tiefkühlfisch und Meeresfrüchte","400 g"),
   no("Rote Paprika","Grüne Paprika","Gemüse","500 g"),
 ];

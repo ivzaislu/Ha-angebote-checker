@@ -33,14 +33,14 @@ Nektar oder Smoothies. `Räucherlachs` meint ausdrücklich geräucherten Lachs, 
 
 ## Prüfungen und Grenzen
 
-`exact-cases.ts` enthält 217 ausdrücklich verfasste Regressionsfälle: 100 passende und
+`exact-cases.ts` enthält 225 ausdrücklich verfasste Regressionsfälle: 108 passende und
 117 unpassende bzw. unzureichend bestimmte Beispiele. Einige Texte stammen aus den vom
 Inhaber gemeldeten Fällen; weitere sind gezielte Gegenbeispiele. Das ist keine zufällige,
 unabhängig erhobene Stichprobe aus dem tatsächlichen Angebotsverkehr.
 
 | Prüfung derselben Beispiele | Vorher (`96f2618`) | Jetzt |
 | --- | ---: | ---: |
-| Passende Produkte gefunden | 35 / 100 | 100 / 100 |
+| Passende Produkte gefunden | 43 / 108 | 108 / 108 |
 | Falsche Treffer | 16 / 117 | 0 / 117 |
 
 Die vorherige Messung verwendet den unveränderten Matcher aus dem genannten Commit
